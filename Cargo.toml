@@ -1,0 +1,45 @@
+[package]
+name = "hex-meetings"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "An unofficial companion for Hex's Meetings: read your call transcripts and hand them to the agent you already use."
+publish = false
+
+[dependencies]
+# Pinned to the Rune revision Hex 3.4 builds with. When bumping, copy the new
+# rev into every entry below and into [patch.crates-io].
+rune = { git = "https://github.com/anomalyco/rune.git", rev = "c853811c8e0e60a632eaa2e72992f871225737ef", features = ["tooling"] }
+rune-kit = { git = "https://github.com/anomalyco/rune.git", rev = "c853811c8e0e60a632eaa2e72992f871225737ef", features = ["markdown"] }
+rune-theme-opencode = { git = "https://github.com/anomalyco/rune.git", rev = "c853811c8e0e60a632eaa2e72992f871225737ef" }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Cargo doesn't inherit a dependency's patches, so Rune's own list is repeated
+# here (Rune's README, "Depending on Rune").
+[patch.crates-io]
+winit = { git = "https://github.com/anomalyco/rune.git", rev = "c853811c8e0e60a632eaa2e72992f871225737ef" }
+sctk-adwaita = { git = "https://github.com/anomalyco/rune.git", rev = "c853811c8e0e60a632eaa2e72992f871225737ef" }
+parley_engine = { git = "https://github.com/anomalyco/rune.git", rev = "c853811c8e0e60a632eaa2e72992f871225737ef" }
+wgpu-hal = { git = "https://github.com/anomalyco/rune.git", rev = "c853811c8e0e60a632eaa2e72992f871225737ef" }
+accesskit_windows = { git = "https://github.com/anomalyco/rune.git", rev = "c853811c8e0e60a632eaa2e72992f871225737ef" }
+accesskit_macos = { git = "https://github.com/anomalyco/rune.git", rev = "c853811c8e0e60a632eaa2e72992f871225737ef" }
+
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+opt-level = 2
+
+[profile.release]
+strip = true
+
+[lints.rust]
+unsafe_code = "forbid"
+unused_must_use = "deny"
+
+[lints.clippy]
+dbg_macro = "deny"
+todo = "warn"
