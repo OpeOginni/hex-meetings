@@ -1,8 +1,9 @@
 //! Where the app keeps its own files, and finding command-line tools.
 //!
 //! An app opened from Finder doesn't get the shell's PATH, so agents
-//! installed in the usual per-user folders (`~/.opencode/bin`,
-//! `~/.local/bin`, Homebrew) would not be found. [`search_path`] adds them.
+//! installed through nvm, Homebrew or `~/.local/bin` (and the `node` some
+//! of them run on) would not be found. [`adopt_login_path`] asks the login
+//! shell for its PATH at launch, and [`search_path`] adds the usual folders.
 
 use std::path::PathBuf;
 
@@ -50,12 +51,51 @@ pub fn tilde(path: &std::path::Path) -> String {
     }
 }
 
-/// The PATH children get: the inherited one, then the usual install folders.
+/// The login shell's PATH, as a terminal would have it. None if the shell
+/// fails or takes over three seconds (a slow or broken shell profile).
+pub fn login_path() -> Option<std::ffi::OsString> {
+    use std::process::{Command, Stdio};
+    const MARK: &str = "__HEX_MEETINGS_PATH__";
+    let shell = std::env::var_os("SHELL").unwrap_or_else(|| "/bin/zsh".into());
+    let mut child = Command::new(shell)
+        .args(["-l", "-i", "-c", &format!("printf '{MARK}%s{MARK}' \"$PATH\"")])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()?;
+    let mut stdout = child.stdout.take()?;
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let mut out = String::new();
+        let _ = std::io::Read::read_to_string(&mut stdout, &mut out);
+        let _ = tx.send(out);
+    });
+    let out = rx.recv_timeout(std::time::Duration::from_secs(3));
+    let _ = child.kill();
+    let _ = child.wait();
+    let path = out.ok()?.split(MARK).nth(1)?.to_string();
+    (!path.is_empty()).then(|| path.into())
+}
+
+static LOGIN_PATH: std::sync::OnceLock<Option<std::ffi::OsString>> = std::sync::OnceLock::new();
+
+/// Opened from Finder (no terminal), reads the login shell's PATH once, so
+/// [`search_path`] puts it first. Call at launch, before the window opens.
+pub fn adopt_login_path() {
+    LOGIN_PATH.get_or_init(|| if std::env::var_os("TERM").is_some() { None } else { login_path() });
+}
+
+/// The PATH children get: the login shell's (when opened from Finder), the
+/// inherited one, then the usual install folders.
 pub fn search_path() -> std::ffi::OsString {
     let home = home();
-    let mut dirs: Vec<PathBuf> = std::env::var_os("PATH")
-        .map(|p| std::env::split_paths(&p).collect())
-        .unwrap_or_default();
+    let mut dirs: Vec<PathBuf> = LOGIN_PATH.get().cloned().flatten().map(|p| std::env::split_paths(&p).collect()).unwrap_or_default();
+    for dir in std::env::var_os("PATH").map(|p| std::env::split_paths(&p).collect::<Vec<_>>()).unwrap_or_default() {
+        if !dirs.contains(&dir) {
+            dirs.push(dir);
+        }
+    }
     for extra in [
         home.join(".opencode/bin"),
         home.join(".local/bin"),
@@ -79,4 +119,15 @@ pub fn which(name: &str) -> Option<PathBuf> {
     std::env::split_paths(&search_path())
         .map(|dir| dir.join(name))
         .find(|path| path.is_file())
+}
+
+#[cfg(test)]
+mod tests {
+    /// Needs a real login shell; run with `--ignored`.
+    #[test]
+    #[ignore]
+    fn the_login_shell_gives_its_path() {
+        let path = super::login_path().expect("the login shell answered");
+        assert!(std::env::split_paths(&path).any(|d| d == std::path::Path::new("/usr/bin")), "{path:?}");
+    }
 }

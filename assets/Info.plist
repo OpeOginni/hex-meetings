@@ -6,11 +6,25 @@
     <string>Hex Meetings</string>
     <key>CFBundleExecutable</key>
     <string>Hex Meetings</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
     <string>io.github.opeoginni.hex-meetings</string>
     <key>CFBundleName</key>
     <string>Hex Meetings</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>@VERSION@</string>
+    <key>CFBundleVersion</key>
+    <string>@VERSION@</string>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.productivity</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>15.0</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSHumanReadableCopyright</key>
+    <string>MIT license. Not affiliated with Hex or Anomaly.</string>
 </dict>
 </plist>

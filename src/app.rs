@@ -68,8 +68,22 @@ pub enum Event {
 pub struct Running {
     pub meeting_id: String,
     pub report: String,
+    /// The agent writing it, for its logo; None until it starts.
+    pub agent: Option<&'static str>,
     pub started: Instant,
     pub stop: Arc<AtomicBool>,
+}
+
+/// The Summary as set on the open call: which agent writes it, where it
+/// goes, and anything to focus on. For that call only; a call starts with
+/// the defaults.
+#[derive(Default)]
+pub struct Quick {
+    pub agent: Option<&'static Agent>,
+    pub to: Option<To>,
+    pub focus: TextEdit,
+    /// Which menu is open: "to" or "agent".
+    pub menu: Option<&'static str>,
 }
 
 /// A report as it's being edited: the four fields the editor shows, and the
@@ -108,6 +122,8 @@ pub struct App {
     pub report_errors: Vec<String>,
     /// The report waiting for the person to confirm where the call goes.
     pub armed: Option<String>,
+    /// The open call's Summary settings.
+    pub quick: Quick,
     pub running: Option<Running>,
     pub activity: Vec<Run>,
     /// The activity entry whose output is open.
@@ -393,6 +409,7 @@ impl App {
         self.detail = None;
         self.detail_error = None;
         self.armed = None;
+        self.quick = Quick::default();
         if let Some(id) = id {
             self.load_detail(&id);
         }
@@ -418,14 +435,23 @@ impl App {
     pub fn retry(&mut self, at_ms: i64) {
         let Some(run) = self.activity.iter().find(|r| r.at_ms == at_ms) else { return };
         let (meeting, report) = (run.meeting_id.clone(), run.report.clone());
-        let Some(id) = self.report_by_name(&report).map(|r| r.id.clone()) else {
-            self.notice = Some(format!("The report \u{201c}{report}\u{201d} doesn't exist any more."));
-            return;
-        };
         if !self.meetings.iter().any(|m| m.id == meeting) {
             self.notice = Some("That call isn't in Hex any more.".into());
             return;
         }
+        // The Summary isn't a saved report: set it up as that run had it.
+        if report == reports::builtin().name {
+            let (agent, to) = (agents::AGENTS.iter().find(|a| a.program == run.program), run.to.as_deref().and_then(To::parse));
+            self.go(Page::Meetings);
+            self.select(Some(meeting));
+            self.quick.agent = agent;
+            self.quick.to = to;
+            return;
+        }
+        let Some(id) = self.report_by_name(&report).map(|r| r.id.clone()) else {
+            self.notice = Some(format!("The report \u{201c}{report}\u{201d} doesn't exist any more."));
+            return;
+        };
         self.go(Page::Meetings);
         self.select(Some(meeting));
         self.armed = Some(id);
@@ -685,6 +711,29 @@ impl App {
         });
     }
 
+    /// The built-in Summary with the open call's settings.
+    pub fn quick_report(&self) -> Report {
+        let mut report = reports::builtin().clone();
+        report.agent = self.quick.agent;
+        report.to = self.quick.to;
+        let extra = self.quick.focus.text.trim();
+        if !extra.is_empty() {
+            report.focus = format!("{}\n\nFor this call, also: {extra}", report.focus);
+        }
+        report
+    }
+
+    /// Runs the Summary on the open call, as set on its page.
+    pub fn summarize(&mut self) {
+        let Some(detail) = self.detail.clone() else { return };
+        if self.running.is_some() {
+            return;
+        }
+        self.quick.menu = None;
+        let report = self.quick_report();
+        self.start_run(detail, report, false);
+    }
+
     /// Runs the armed report on the selected meeting's transcript.
     pub fn run_armed(&mut self) {
         let Some(report) = self.armed.take().and_then(|id| self.report(&id).cloned()) else { return };
@@ -721,7 +770,7 @@ impl App {
         let Some(path) = self.hex_path() else { return };
         let Some(name) = self.report(&report).map(|r| r.name.clone()) else { return };
         // Marks the app busy until the transcript is read and the run starts.
-        self.running = Some(Running { meeting_id: meeting.clone(), report: name, started: Instant::now(), stop: Default::default() });
+        self.running = Some(Running { meeting_id: meeting.clone(), report: name, agent: None, started: Instant::now(), stop: Default::default() });
         let send = self.send();
         std::thread::spawn(move || send(Event::AutoDetail(report, hex::show(&path, &meeting))));
     }
@@ -753,6 +802,7 @@ impl App {
         self.running = Some(Running {
             meeting_id: m.id.clone(),
             report: report.name.clone(),
+            agent: plan.agent,
             started: Instant::now(),
             stop: stop.clone(),
         });

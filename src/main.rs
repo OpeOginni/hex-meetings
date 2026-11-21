@@ -46,6 +46,7 @@ const SCENES: &[Scene] = &[
         s.running = Some(app::Running {
             meeting_id: "demo-sales".into(),
             report: "Sales call to Notion".into(),
+            agent: Some("opencode"),
             started: std::time::Instant::now() - std::time::Duration::from_secs(12),
             stop: Default::default(),
         })
@@ -146,6 +147,19 @@ const SCENES: &[Scene] = &[
         run.output = "opencode failed (exit 1).\n\nNo provider is configured.".into();
         s.activity.insert(0, run);
     }),
+    ("summary-to", |s| {
+        s.settings.connections.push(places::Connection { place: places::Place::Slack, target: "#meeting-notes".into() });
+        s.settings.connections.push(places::Connection { place: places::Place::Notion, target: String::new() });
+        s.quick.agent = agents::by_id("claude");
+        s.quick.menu = Some("to");
+    }),
+    ("summary-agent", |s| s.quick.menu = Some("agent")),
+    ("summary-set", |s| {
+        s.settings.connections.push(places::Connection { place: places::Place::Slack, target: "#meeting-notes".into() });
+        s.quick.agent = agents::by_id("claude");
+        s.quick.to = Some(places::To::Place(places::Place::Slack));
+        s.quick.focus = rune::TextEdit::new("Pricing and the EU data question");
+    }),
     ("reports", |s| s.page = Page::Reports),
     ("edit-report", |s| {
         s.page = Page::Reports;
@@ -188,6 +202,9 @@ const SCENES: &[Scene] = &[
 ];
 
 fn main() {
+    if !headless() {
+        paths::adopt_login_path();
+    }
     // The Dock icon, also when run with `cargo run` (no app bundle).
     if !headless()
         && let Err(e) = rune::set_app_icon(include_bytes!("../assets/icon.png").to_vec())

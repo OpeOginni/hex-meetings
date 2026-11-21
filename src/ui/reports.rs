@@ -111,7 +111,7 @@ fn pick_agent(s: &mut App, agent: Option<&'static crate::agents::Agent>) {
 }
 
 /// A menu's button: the chosen item's logo and name, and a chevron.
-fn menu_trigger(k: &Kit, key: &str, logo: logos::Mark, label: String, toggle: fn(&mut App)) -> El {
+pub(super) fn menu_trigger(k: &Kit, key: &str, logo: logos::Mark, label: String, toggle: fn(&mut App)) -> El {
     let c = &k.c;
     row()
         .key(format!("{key}-trigger"))
@@ -156,62 +156,26 @@ fn editor(s: &App, k: &Kit, d: &Draft, hair: f32, layer: &mut Vec<El>) -> (El, E
         .build(k)
         .key("report-focus");
 
-    // Where it goes: each place with its logo. Places without a key can't be
-    // picked until they're connected in Setup.
-    let lead = |m: logos::Mark| el().size(18.0, 18.0).center().child(super::mark(k, m, 16.0));
-    let mut to_menu = Menu::new("report-to")
-        .trigger(menu_trigger(k, "report-to", destination_mark(s, d), destination_label(s, d), |s| toggle(s, "to")))
-        .open(d.menu == Some("to"))
-        .min_width(280.0)
-        .placement(rune_kit::Placement::BottomStart)
-        .on_close(|s: &mut App| close(s))
-        .item(
-            MenuItem::new("On the call")
-                .lead(lead((&oc::WAVEFORM, None)))
-                .description("Shown here, to copy or save")
-                .checked(d.to.is_none() && d.sends_to.is_none())
-                .on_select(|s: &mut App| pick_to(s, None, false)),
-        );
-    // Connected places first; the rest below, greyed, with the way to connect them.
-    let (connected, missing): (Vec<_>, Vec<_>) = PLACES.into_iter().partition(|p| s.connection(To::Place(*p)).is_some());
-    for p in connected {
-        let target = s.connection(To::Place(p)).map(|c| c.target.clone()).filter(|t| !t.is_empty() && p != crate::places::Place::Notion);
-        let mut item = MenuItem::new(p.name())
-            .lead(lead(logos::for_place(p)))
-            .checked(d.to == Some(To::Place(p)))
-            .on_select(move |s: &mut App| pick_to(s, Some(To::Place(p)), false));
-        if let Some(t) = target {
-            item = item.description(t);
-        }
-        to_menu = to_menu.item(item);
-    }
     // Only a report that already uses it: "whichever tracker is connected".
-    if d.to == Some(To::Issues) {
+    let tracker = (d.to == Some(To::Issues)).then(|| {
         let label = s.connection(To::Issues).map_or("Your tracker".to_string(), |c| format!("Your tracker ({})", c.place.name()));
         let logo = s.connection(To::Issues).map_or((&oc::CHECKLIST, None), |c| logos::for_place(c.place));
-        to_menu = to_menu.item(MenuItem::new(label).lead(lead(logo)).description("Whichever of GitHub or Linear is connected").checked(true));
-    }
-    if !missing.is_empty() {
-        to_menu = to_menu.separator();
-        for p in missing {
-            to_menu = to_menu.item(MenuItem::new(p.name()).lead(lead(logos::for_place(p))).description("Not connected").disabled(true));
-        }
-    }
+        MenuItem::new(label).lead(lead(k, logo)).description("Whichever of GitHub or Linear is connected").checked(true)
+    });
+    let to_menu = places_menu(s, k, "report-to", destination_mark(s, d), destination_label(s, d), d.to, d.sends_to.is_none(), tracker, d.menu == Some("to"), |s| toggle(s, "to"), close, |s, to| {
+        pick_to(s, to, false)
+    });
     // The agent posting with its own tools is for anywhere not built in, so
     // it sits last, beside connecting a place.
     let to_menu = to_menu
-        .separator()
         .item(
             MenuItem::new(AGENT_TOOLS)
-                .lead(lead(agent_mark(s, d)))
+                .lead(lead(k, agent_mark(s, d)))
                 .description("For anywhere else, with its own connections")
                 .checked(d.sends_to.is_some())
                 .on_select(|s: &mut App| pick_to(s, None, true)),
         )
-        .item(MenuItem::new("Connect a place in Setup\u{2026}").lead(lead((&oc::SLIDERS, None))).on_select(|s: &mut App| {
-            close(s);
-            s.go(crate::app::Page::Setup);
-        }))
+        .item(connect_item(k))
         .build(k, layer);
     // Said only when it matters: a place that isn't connected, or an agent
     // that will use its tools unasked.
@@ -237,43 +201,7 @@ fn editor(s: &App, k: &Kit, d: &Draft, hair: f32, layer: &mut Vec<El>) -> (El, E
             .build(k)
             .key("report-place")
     });
-
-    // The agent: each with its logo; ones that aren't installed can't be picked.
-    let default_label = s.agent().map_or("Default agent".to_string(), |a| format!("Default ({})", a.name));
-    let agent_label = d.agent.map_or(default_label.clone(), |a| a.name.to_string());
-    let mut agent_menu = Menu::new("report-agent")
-        .trigger(menu_trigger(k, "report-agent", agent_mark(s, d), agent_label, |s| toggle(s, "agent")))
-        .open(d.menu == Some("agent"))
-        .min_width(260.0)
-        .placement(rune_kit::Placement::BottomStart)
-        .on_close(|s: &mut App| close(s))
-        .item(
-            MenuItem::new(default_label)
-                .lead(lead(s.agent().and_then(|a| logos::agent(a.id)).unwrap_or((&oc::CONSOLE, None))))
-                .description("Changes with the default in Setup")
-                .checked(d.agent.is_none())
-                .on_select(|s: &mut App| pick_agent(s, None)),
-        )
-        .separator();
-    // Installed agents first; the rest below, greyed.
-    let (installed, missing): (Vec<_>, Vec<_>) = AGENTS.iter().partition(|a| s.installed.contains(&a.id));
-    for a in installed {
-        agent_menu = agent_menu.item(
-            MenuItem::new(a.name)
-                .lead(lead(logos::agent(a.id).unwrap_or((&oc::CONSOLE, None))))
-                .checked(d.agent.is_some_and(|x| x.id == a.id))
-                .on_select(move |s: &mut App| pick_agent(s, Some(a))),
-        );
-    }
-    if !missing.is_empty() {
-        agent_menu = agent_menu.separator();
-        for a in missing {
-            agent_menu = agent_menu.item(
-                MenuItem::new(a.name).lead(lead(logos::agent(a.id).unwrap_or((&oc::CONSOLE, None)))).description("Not installed").disabled(true),
-            );
-        }
-    }
-    let agent = agent_menu.build(k, layer);
+    let agent = agent_menu(s, k, "report-agent", d.agent, d.menu == Some("agent"), |s| toggle(s, "agent"), close, pick_agent).build(k, layer);
 
     let form = group(
         k,
@@ -313,6 +241,127 @@ fn editor(s: &App, k: &Kit, d: &Draft, hair: f32, layer: &mut Vec<El>) -> (El, E
         out = out.child(text("Press Delete for good to remove this report. This can't be undone.").font(k.ty.small).color(c.danger.fg));
     }
     (head, out.child(form).child(footer))
+}
+
+fn lead(k: &Kit, m: logos::Mark) -> El {
+    el().size(18.0, 18.0).center().child(super::mark(k, m, 16.0))
+}
+
+/// Goes to Setup, where places are connected.
+pub(super) fn connect_item(k: &Kit) -> MenuItem {
+    MenuItem::new("Connect a place in Setup\u{2026}").lead(lead(k, (&oc::SLIDERS, None))).on_select(|s: &mut App| {
+        close(s);
+        s.quick.menu = None;
+        s.go(crate::app::Page::Setup);
+    })
+}
+
+/// Where a result goes: "On the call", then each connected place with its
+/// logo, then `extra`, then the places without a key, greyed until they're
+/// connected in Setup. Ends with a separator.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn places_menu(
+    s: &App,
+    k: &Kit,
+    key: &str,
+    mark: logos::Mark,
+    label: String,
+    to: Option<To>,
+    on_call: bool,
+    extra: Option<MenuItem>,
+    open: bool,
+    toggle: fn(&mut App),
+    close: fn(&mut App),
+    pick: fn(&mut App, Option<To>),
+) -> Menu {
+    let mut menu = Menu::new(key.to_string())
+        .trigger(menu_trigger(k, key, mark, label, toggle))
+        .open(open)
+        .min_width(280.0)
+        .placement(rune_kit::Placement::BottomStart)
+        .on_close(move |s: &mut App| close(s))
+        .item(
+            MenuItem::new("On the call")
+                .lead(lead(k, (&oc::WAVEFORM, None)))
+                .description("Shown here, to copy or save")
+                .checked(to.is_none() && on_call)
+                .on_select(move |s: &mut App| pick(s, None)),
+        );
+    let (connected, missing): (Vec<_>, Vec<_>) = PLACES.into_iter().partition(|p| s.connection(To::Place(*p)).is_some());
+    for p in connected {
+        let target = s.connection(To::Place(p)).map(|c| c.target.clone()).filter(|t| !t.is_empty() && p != crate::places::Place::Notion);
+        let mut item = MenuItem::new(p.name())
+            .lead(lead(k, logos::for_place(p)))
+            .checked(to == Some(To::Place(p)))
+            .on_select(move |s: &mut App| pick(s, Some(To::Place(p))));
+        if let Some(t) = target {
+            item = item.description(t);
+        }
+        menu = menu.item(item);
+    }
+    if let Some(item) = extra {
+        menu = menu.item(item);
+    }
+    if !missing.is_empty() {
+        menu = menu.separator();
+        for p in missing {
+            menu = menu.item(MenuItem::new(p.name()).lead(lead(k, logos::for_place(p))).description("Not connected").disabled(true));
+        }
+    }
+    menu.separator()
+}
+
+/// Which agent writes it: the default, then the installed agents, then the
+/// rest, greyed.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn agent_menu(
+    s: &App,
+    k: &Kit,
+    key: &str,
+    chosen: Option<&'static crate::agents::Agent>,
+    open: bool,
+    toggle: fn(&mut App),
+    close: fn(&mut App),
+    pick: fn(&mut App, Option<&'static crate::agents::Agent>),
+) -> Menu {
+    let logo = |a: &crate::agents::Agent| logos::agent(a.id).unwrap_or((&oc::CONSOLE, None));
+    let default_label = s.agent().map_or("Default agent".to_string(), |a| format!("Default ({})", a.name));
+    let label = chosen.map_or(default_label.clone(), |a| a.name.to_string());
+    let mark = chosen.or(s.agent()).map_or((&oc::CONSOLE, None), logo);
+    let mut menu = Menu::new(key.to_string())
+        .trigger(menu_trigger(k, key, mark, label, toggle))
+        .open(open)
+        .min_width(260.0)
+        .placement(rune_kit::Placement::BottomStart)
+        .on_close(move |s: &mut App| close(s))
+        .item(
+            MenuItem::new(default_label)
+                .lead(lead(k, s.agent().map_or((&oc::CONSOLE, None), logo)))
+                .description("Changes with the default in Setup")
+                .checked(chosen.is_none() || chosen.map(|a| a.id) == s.agent().map(|a| a.id))
+                .on_select(move |s: &mut App| pick(s, None)),
+        );
+    // The default is already the first item.
+    let (installed, missing): (Vec<_>, Vec<_>) =
+        AGENTS.iter().filter(|a| Some(a.id) != s.agent().map(|d| d.id)).partition(|a| s.installed.contains(&a.id));
+    if !installed.is_empty() {
+        menu = menu.separator();
+    }
+    for a in installed {
+        menu = menu.item(
+            MenuItem::new(a.name)
+                .lead(lead(k, logo(a)))
+                .checked(chosen.is_some_and(|x| x.id == a.id))
+                .on_select(move |s: &mut App| pick(s, Some(a))),
+        );
+    }
+    if !missing.is_empty() {
+        menu = menu.separator();
+        for a in missing {
+            menu = menu.item(MenuItem::new(a.name).lead(lead(k, logo(a))).description("Not installed").disabled(true));
+        }
+    }
+    menu
 }
 
 /// The agent writing this report: the one it names, else the default.

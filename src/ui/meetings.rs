@@ -23,7 +23,7 @@ pub fn page(s: &App, k: &Kit, hair: f32, layer: &mut Vec<El>) -> El {
         .min_h(0.0)
         .child(list(s, k))
         .child(el().w(hair).h_full().fill(k.c.border_weak))
-        .child(detail(s, k))
+        .child(detail(s, k, layer))
 }
 
 fn status_tag(k: &Kit, m: &Meeting) -> Option<El> {
@@ -153,7 +153,7 @@ fn list(s: &App, k: &Kit) -> El {
         .child(col().key("list-scroll").w_full().grow(1.0).min_h(0.0).px(8.0).child(body).scroll(ScrollSpec { stick_bottom: false }))
 }
 
-fn detail(s: &App, k: &Kit) -> El {
+fn detail(s: &App, k: &Kit, layer: &mut Vec<El>) -> El {
     let shell = |content: El| {
         col()
             .key("detail")
@@ -211,7 +211,7 @@ fn detail(s: &App, k: &Kit) -> El {
                 .child(text(notes.summary.clone()).font(k.ty.body).color(c.text_base).wrap().selectable(true)),
         );
     }
-    body = body.child(report_bar(s, k, m));
+    body = body.child(report_bar(s, k, m, layer));
     if let Some(run) = s.last_run(&m.id) {
         body = body.child(result(s, k, run));
         if run.outcome == crate::activity::Outcome::Done && !s.is_settled(&m.id) {
@@ -222,8 +222,9 @@ fn detail(s: &App, k: &Kit) -> El {
     shell(body)
 }
 
-/// Reports as buttons; a press asks where the call goes before anything runs.
-fn report_bar(s: &App, k: &Kit, m: &Meeting) -> El {
+/// The Summary, set up for this call, and the saved reports as buttons; a
+/// report asks where the call goes before anything runs.
+fn report_bar(s: &App, k: &Kit, m: &Meeting, layer: &mut Vec<El>) -> El {
     let c = &k.c;
     let card = col()
         .key("report-bar")
@@ -235,7 +236,7 @@ fn report_bar(s: &App, k: &Kit, m: &Meeting) -> El {
         .border(1.0, c.border_weak);
     if let Some(r) = &s.running {
         let secs = r.started.elapsed().as_secs();
-        let agent = s.report_by_name(&r.report).and_then(|rep| s.plan(rep).ok()).and_then(|p| p.agent);
+        let agent = r.agent;
         let elsewhere = (r.meeting_id != m.id).then(|| text("on another call").font(k.ty.small).color(c.text_faint));
         return card.child(
             row()
@@ -302,8 +303,7 @@ fn report_bar(s: &App, k: &Kit, m: &Meeting) -> El {
         );
     }
     let mut buttons = row().key("reports").w_full().gap(8.0).flex_wrap();
-    // The built-in Summary first, then the person's own reports.
-    for r in std::iter::once(crate::reports::builtin()).chain(&s.reports) {
+    for r in &s.reports {
         let id = r.id.clone();
         buttons = buttons.child(
             Button::new(r.name.clone())
@@ -331,8 +331,85 @@ fn report_bar(s: &App, k: &Kit, m: &Meeting) -> El {
             .key("new-report-from-call"),
     );
     // Only a new user needs telling what a report is for.
-    let hint = s.reports.is_empty().then(|| text("Make a report to send calls to Slack, Notion or a tracker.").font(k.ty.small).color(c.text_faint).wrap());
-    card.child(text("Reports").font(k.ty.small_medium).color(c.text_faint)).child(buttons).children(hint)
+    let hint = s.reports.is_empty().then(|| text("Save a focus and where it goes as a report, to run it on any call.").font(k.ty.small).color(c.text_faint).wrap());
+    card.child(quick(s, k, layer))
+        .child(el().w_full().h(1.0).my(4.0).fill(c.border_weak))
+        .child(text("Reports").font(k.ty.small_medium).color(c.text_faint))
+        .child(buttons)
+        .children(hint)
+}
+
+fn quick_toggle(s: &mut App, menu: &'static str) {
+    s.quick.menu = if s.quick.menu == Some(menu) { None } else { Some(menu) };
+}
+
+/// The Summary for this call: which agent writes it, where it goes, and
+/// anything to look out for. Where the transcript goes shows beside the
+/// button that sends it.
+fn quick(s: &App, k: &Kit, layer: &mut Vec<El>) -> El {
+    let c = &k.c;
+    let q = &s.quick;
+    let report = s.quick_report();
+    let plan = s.plan(&report);
+    let agent = super::reports::agent_menu(s, k, "quick-agent", q.agent, q.menu == Some("agent"), |s| quick_toggle(s, "agent"), |s| s.quick.menu = None, |s, a| {
+        s.quick.agent = a;
+        s.quick.menu = None;
+    })
+    .build(k, layer);
+    let label = q.to.map_or("On the call".to_string(), |to| to.name().to_string());
+    let to = super::reports::places_menu(
+        s,
+        k,
+        "quick-to",
+        super::reports::report_mark(s, &report),
+        label,
+        q.to,
+        true,
+        None,
+        q.menu == Some("to"),
+        |s| quick_toggle(s, "to"),
+        |s| s.quick.menu = None,
+        |s, to| {
+            s.quick.to = to;
+            s.quick.menu = None;
+        },
+    )
+    .item(super::reports::connect_item(k))
+    .build(k, layer);
+    let focus = TextInput::new(&q.focus)
+        .placeholder("Anything to look out for? (optional)")
+        .width(None)
+        .on_edit(|s: &mut App| &mut s.quick.focus)
+        .build(k)
+        .key("quick-focus");
+    let route = match &plan {
+        Ok(plan) => row()
+            .gap(6.0)
+            .center_y()
+            .grow(1.0)
+            .shrink()
+            .min_w(0.0)
+            .child(icon(&oc::SHIELD, 14.0).color(c.icon_muted))
+            .child(text(format!("The transcript goes to {}.", lower_first(&plan.sends_to))).font(k.ty.small).color(c.text_muted).wrap().shrink().min_w(0.0)),
+        Err(e) => row().grow(1.0).shrink().min_w(0.0).child(text(e.clone()).font(k.ty.small).color(c.danger.fg).wrap()),
+    };
+    col()
+        .key("quick")
+        .w_full()
+        .gap(10.0)
+        .child(text("Summary").font(k.ty.ui_medium).color(c.text_strong))
+        .child(row().gap(8.0).flex_wrap().center_y().child(agent).child(to))
+        .child(focus)
+        .child(
+            row().w_full().gap(12.0).center_y().child(route).child(
+                Button::new("Summarize")
+                    .variant(ButtonVariant::Submit)
+                    .disabled(s.detail.is_none() || plan.is_err())
+                    .on_press(App::summarize)
+                    .build(k)
+                    .key("summarize"),
+            ),
+        )
 }
 
 fn lower_first(s: &str) -> String {

@@ -5,7 +5,7 @@ An unofficial Rune desktop app that reads Hex's meetings through its public CLI 
 ## Layout
 
 - `src/hex.rs`: the only code that talks to Hex: `hex meetings list|show --json` (JSON version 1), `hex settings get meetings`, `hex model list`, `hex settings set meetings.retention`, `hex labs on meetings`, and `hex window show meetings|models`. Never switch Hex's speech model: dictation uses it too. Don't read Hex's internal folders.
-- `src/reports.rs`: the report format, the prompt the app builds around a report's focus (`Report::prompt`), and the one built-in report, Summary (`reports::builtin`). The app writes no reports for people; `examples/reports/*.md` are samples (and the demo's data). Edited in the app (`src/ui/reports.rs`) or by hand.
+- `src/reports.rs`: the report format, the prompt the app builds around a report's focus (`Report::prompt`), and the built-in Summary (`reports::builtin`). Summary isn't a saved report: the call's page sets its agent, where it goes and an extra focus, for that call only (`App::quick`, `App::quick_report`). The app writes no reports for people; `examples/reports/*.md` are samples (and the demo's data). Edited in the app (`src/ui/reports.rs`) or by hand.
 - `src/agents.rs`: the known agent CLIs (OpenCode, Claude Code, Codex, Cursor Agent, Pi) and their headless flags. Their marks are in `src/ui/logos.rs`.
 - `src/settings.rs`: the default agent and its model, the summaries folder, and the calls already kept or deleted.
 - `src/speech.rs`: whether Hex's speech model covers the calls' language, and which models would.
@@ -13,8 +13,10 @@ An unofficial Rune desktop app that reads Hex's meetings through its public CLI 
 - `src/runner.rs`: runs an agent's command on a worker thread, with no shell.
 - `src/activity.rs`: the local run log.
 - `src/app.rs`: state, events, workers (inbox + waker, drained in `poll`).
-- `assets/icon.svg`: the app icon (master); `assets/icon.png` is its 1024 px render, used for the Dock and the README. The in-app copy is `logos::APP`.
+- `assets/icon.svg`: the app icon (master); `assets/icon.png` is its 1024 px render with a transparent background, used for the Dock and the README. Render it with headless Chrome (`--default-background-color=00000000`): Quick Look adds a white background, and AppKit drops the shadows. The in-app copy is `logos::APP`.
 - `src/ui/`: views. `src/demo.rs`: made-up data for scenes and tests.
+- `scripts/run-macos.sh` runs a dev build as an app bundle. `scripts/package-macos.sh` builds the release app, zip and disk image into `dist/`; `.github/workflows/release.yml` runs it for a `v*` tag matching `Cargo.toml` and publishes the release. `scripts/install.sh` installs the latest release (curl-downloaded, so no quarantine prompt).
+- `src/paths.rs`: opened from Finder, the app takes the login shell's PATH (`adopt_login_path`), so agents installed with nvm or Homebrew are found.
 
 ## Rules
 

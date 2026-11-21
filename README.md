@@ -13,23 +13,19 @@
 
 See the [example reports](examples/reports/) for ideas.
 
-## Get started
+## Install
 
-You need an **Apple silicon Mac with macOS 15 or later**, **Hex 3.4 or later**, and [Rust installed via rustup](https://rustup.rs/). Hex has a Windows build, but its Meetings recording feature is macOS-only, so this app does not support the Windows meeting workflow.
+You need an **Apple silicon Mac with macOS 15 or later** and **Hex 3.4 or later**. Hex has a Windows build, but its Meetings recording feature is macOS-only, so Hex Meetings is macOS-only too.
+
+Install the latest release into `/Applications` (run it again to update):
 
 ```sh
-git clone https://github.com/OpeOginni/hex-meetings.git
-cd hex-meetings
-sh scripts/run-macos.sh
+curl -fsSL https://raw.githubusercontent.com/OpeOginni/hex-meetings/main/scripts/install.sh | sh
 ```
+
+Or download `Hex-Meetings-macOS-arm64.dmg` from the [latest release](https://github.com/OpeOginni/hex-meetings/releases/latest) and drag the app into Applications. The app isn't notarized by Apple yet, so the first time you open a downloaded copy, macOS blocks it: open **System Settings › Privacy & Security** and click **Open Anyway**. The install command doesn't need this step.
 
 Follow **Get started** in the app to enable Meetings in Hex and record your first call. To run reports, install one of the supported agent CLIs and select it in **Setup**.
-
-To look around with fictional calls, no Hex or agent needed:
-
-```sh
-HEX_MEETINGS_DEMO=1 sh scripts/run-macos.sh
-```
 
 ## Where your data goes
 
@@ -39,10 +35,24 @@ Before a manual run, the app shows where your transcript will go. Your agent's m
 
 ## Development
 
+You need [Rust installed via rustup](https://rustup.rs/).
+
 ```sh
+git clone https://github.com/OpeOginni/hex-meetings.git
+cd hex-meetings
+sh scripts/run-macos.sh                       # build and open the app
+HEX_MEETINGS_DEMO=1 sh scripts/run-macos.sh   # with fictional calls, no Hex or agent needed
 cargo test --locked
 cargo run --locked -- --list-scenes
 cargo run --locked -- --snap overview.png --scene result --theme dark
 ```
+
+To release, bump `version` in `Cargo.toml`, run `cargo build` to update `Cargo.lock`, commit, then push a matching tag:
+
+```sh
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+The [release workflow](.github/workflows/release.yml) tests, builds and packages the app (`scripts/package-macos.sh`), and publishes the zip and disk image. It signs and notarizes them when the signing secrets listed in the workflow are set.
 
 Built with [Rune](https://github.com/anomalyco/rune). [MIT license](LICENSE). See [asset credits](docs/credits.md).
