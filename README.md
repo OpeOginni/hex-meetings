@@ -1,9 +1,9 @@
-<p align="center"><img src="assets/icon.png" width="88" alt=""></p>
+<p align="center"><img src="assets/icon.svg" width="88" alt=""></p>
 <h1 align="center">Hex Meetings</h1>
 <p align="center">Turn recorded calls into summaries, action items, and follow-ups with the AI agent you already use.</p>
 <p align="center">An unofficial macOS companion for <a href="https://anoma.ly/hex/">Hex</a>. Not affiliated with Hex or Anomaly.</p>
 
-![Hex Meetings showing a fictional sales call, available reports, and a finished summary with action items](docs/result.png)
+![Hex Meetings showing a fictional sales call, per-call Summary controls, and the finished action items](docs/overview.png)
 
 ## How it works
 
@@ -44,7 +44,7 @@ sh scripts/run-macos.sh                       # build and open the app
 HEX_MEETINGS_DEMO=1 sh scripts/run-macos.sh   # with fictional calls, no Hex or agent needed
 cargo test --locked
 cargo run --locked -- --list-scenes
-cargo run --locked -- --snap overview.png --scene result --theme dark
+cargo run --locked -- --snap docs/overview.png --scene result --theme dark --size 1240x820
 ```
 
 To release, bump `version` in `Cargo.toml`, run `cargo build` to update `Cargo.lock`, commit, then push a matching tag:
