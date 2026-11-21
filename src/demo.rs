@@ -65,9 +65,51 @@ pub fn sales_detail() -> Detail {
     }
 }
 
+/// Hex's meeting settings and a few of its speech models, as Hex 3.4 lists them.
+pub fn overview() -> crate::hex::Overview {
+    let model = |id: &str, name: &str, langs: &[&str], installed: bool, selected: bool| crate::speech::SpeechModel {
+        id: id.into(),
+        name: name.into(),
+        languages: langs.iter().map(|l| l.to_string()).collect(),
+        size: "739 MB".into(),
+        installed,
+        selected,
+    };
+    let mut settings = std::collections::BTreeMap::new();
+    settings.insert("meetings.enabled".to_string(), serde_json::json!(true));
+    settings.insert("meetings.retention".to_string(), serde_json::json!("week"));
+    settings.insert("meetings.summaries".to_string(), serde_json::json!("mac"));
+    settings.insert("labs.more_call_apps".to_string(), serde_json::json!(true));
+    crate::hex::Overview {
+        settings,
+        models: vec![
+            model("parakeet_unified_en", "Parakeet Unified English", &["en"], true, true),
+            model("parakeet_v3", "Parakeet v3", &["en", "de", "fr", "es", "it", "nl", "pl", "pt", "sv"], false, false),
+            model("nemotron_3_5_asr", "Nemotron 3.5 ASR", &["en", "de", "fr", "es", "it", "ja"], false, false),
+            model("whisper_large_v3_turbo", "Whisper large-v3-turbo", &["*"], false, false),
+        ],
+    }
+}
+
+/// Example reports, as someone might make them (`examples/reports`).
+pub fn reports() -> Vec<crate::reports::Report> {
+    let files = [
+        ("customer-feedback", include_str!("../examples/reports/customer-feedback.md")),
+        ("notion-sales-call", include_str!("../examples/reports/notion-sales-call.md")),
+        ("slack-post", include_str!("../examples/reports/slack-post.md")),
+        ("support-issues", include_str!("../examples/reports/support-issues.md")),
+    ];
+    let mut out: Vec<_> = files
+        .iter()
+        .map(|(id, src)| crate::reports::parse(id, std::path::Path::new(&format!("{id}.md")), src).expect("example report"))
+        .collect();
+    out.sort_by_key(|r| r.name.to_lowercase());
+    out
+}
+
 /// An app with the demo meetings loaded and the sales call open.
 pub fn app() -> App {
-    let (recipes, _) = crate::recipes::defaults();
+    let reports = reports();
     App {
         offline: true,
         hex: Some(HexStatus::Found { path: "/Applications/Hex.app/Contents/MacOS/hex".into(), version: Some("3.4.0".into()) }),
@@ -75,43 +117,77 @@ pub fn app() -> App {
         meetings_loaded: true,
         selected: Some("demo-sales".into()),
         detail: Some(sales_detail()),
-        recipes,
+        reports,
+        installed: vec!["opencode", "claude", "codex", "pi"],
+        overview: Some(Ok(overview())),
+        mac_language: Some("en"),
+        meetings_on: Some(true),
+        model_lists: [(
+            "opencode",
+            Ok(["anthropic/claude-sonnet-5-20261015", "anthropic/claude-opus-5", "github-copilot/claude-sonnet-4.5", "github-copilot/gpt-5.6", "openai/gpt-5.6", "openai/gpt-5.6-codex-mini", "opencode/fast"]
+                .map(String::from)
+                .to_vec()),
+        )]
+        .into(),
         activity: vec![
             Run {
                 at_ms: chrono::Utc::now().timestamp_millis() - 4 * HOUR,
                 meeting_id: "demo-support".into(),
                 meeting_title: "Fabrikam: export failing".into(),
-                recipe: "Support call to issues".into(),
-                sends_to: "The model your OpenCode is set to use, then your issue tracker".into(),
+                report: "Support call to issues".into(),
+                sends_to: "The model your OpenCode is set to use, then your issue tracker once you approve it".into(),
                 program: "opencode".into(),
                 outcome: Outcome::Done,
-                output: "- **CSV export times out above 50k rows**: LIN-412\n- **Exported dates use US format**: LIN-413".into(),
+                output: r#"[{"title": "CSV export times out above 50k rows", "body": "Exports of more than 50,000 rows stop after 60 seconds."}, {"title": "Exported dates use US format", "body": "Dates come out as MM/DD/YYYY for EU accounts."}]"#.into(),
+                to: Some("issues".into()),
+                delivery: Some(crate::activity::Delivery::Posted {
+                    to: "GitHub (fabrikam/exporter)".into(),
+                    links: vec!["https://github.com/fabrikam/exporter/issues/412".into(), "https://github.com/fabrikam/exporter/issues/413".into()],
+                }),
+                auto: true,
             },
             Run {
                 at_ms: chrono::Utc::now().timestamp_millis() - 25 * HOUR,
                 meeting_id: "demo-standup".into(),
                 meeting_title: "Team standup".into(),
-                recipe: "Summary and action items".into(),
+                report: "Summary".into(),
                 sends_to: "The model your OpenCode is set to use".into(),
                 program: "opencode".into(),
                 outcome: Outcome::Failed,
                 output: "opencode failed (exit 1).\n\nNo provider is configured.".into(),
+                to: None,
+                delivery: None,
+                auto: false,
             },
         ],
         ..App::default()
     }
 }
 
-/// What the sales call's summary recipe would give back.
+/// What the sales call's summary report would give back.
 pub fn summary_run() -> Run {
     Run {
         at_ms: chrono::Utc::now().timestamp_millis() - 60_000,
         meeting_id: "demo-sales".into(),
         meeting_title: "Northwind intro call".into(),
-        recipe: "Summary and action items".into(),
+        report: "Summary".into(),
         sends_to: "The model your OpenCode is set to use".into(),
         program: "opencode".into(),
         outcome: Outcome::Done,
         output: "**Summary**\n\nNorthwind (Priya, support operations; Jonas, IT) records few customer calls because legal is worried about where recordings go. Local transcription with an EU-hosted summary model addresses that. They have budget for a 20-seat pilot this quarter.\n\n**Action items**\n\n- [ ] You: send a pilot plan by Friday, with a data-flow diagram\n- [ ] You: explain how deletion works\n- [ ] Them: share the plan with legal\n\n**Open questions**\n\n- Which EU model provider Northwind already has a contract with.".into(),
+        to: None,
+        delivery: None,
+        auto: false,
+    }
+}
+
+/// What the Slack report would give back, waiting for approval.
+pub fn slack_run() -> Run {
+    Run {
+        report: "Summary to Slack".into(),
+        sends_to: "The model your OpenCode is set to use, then Slack once you approve it".into(),
+        output: "*Northwind intro call* (34 min)\nNorthwind wants a 20-seat pilot for its EU support team this quarter, with transcripts kept in the EU.\n• You: send the pilot plan and data-flow diagram by Friday\n• You: explain how deletion works\n• Northwind: share the plan with legal".into(),
+        to: Some("slack".into()),
+        ..summary_run()
     }
 }

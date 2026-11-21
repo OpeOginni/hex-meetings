@@ -6,9 +6,14 @@ fn local(ms: i64) -> Option<DateTime<Local>> {
     Local.timestamp_millis_opt(ms).single()
 }
 
-/// `2026-11-20 14:00`, for prompts and file names.
+/// `2026-11-20 14:00`, for prompts.
 pub fn date_time(ms: i64) -> String {
     local(ms).map(|t| t.format("%Y-%m-%d %H:%M").to_string()).unwrap_or_default()
+}
+
+/// `2026-11-20`, for file names.
+pub fn date(ms: i64) -> String {
+    local(ms).map(|t| t.format("%Y-%m-%d").to_string()).unwrap_or_default()
 }
 
 /// `14:00`.

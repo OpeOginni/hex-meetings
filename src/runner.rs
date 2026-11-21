@@ -1,4 +1,4 @@
-//! Runs one recipe's command on a worker thread and reports how it ended.
+//! Runs one report's command on a worker thread and reports how it ended.
 //! The child runs in the app's data folder with the widened PATH, never
 //! through a shell; a stop request or the time limit kills it.
 
@@ -30,7 +30,7 @@ fn reader(mut pipe: impl Read + Send + 'static) -> std::thread::JoinHandle<Strin
 /// Blocks until the command ends; call it from a worker thread.
 pub fn run(argv: &[String], stop: &Arc<AtomicBool>) -> Ended {
     let Some((program, args)) = argv.split_first() else {
-        return Ended { outcome: Outcome::Failed, output: "The recipe has no command.".into() };
+        return Ended { outcome: Outcome::Failed, output: "The report has no command.".into() };
     };
     let path = crate::paths::search_path();
     let resolved = crate::paths::which(program).unwrap_or_else(|| program.into());

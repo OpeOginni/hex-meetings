@@ -15,6 +15,10 @@ rune-theme-opencode = { git = "https://github.com/anomalyco/rune.git", rev = "c8
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# Tokens for the places results go (Slack, GitHub, Linear) live in the macOS
+# Keychain, and the posting is plain HTTPS.
+keyring = { version = "3", features = ["apple-native"] }
+ureq = { version = "2", features = ["json"] }
 
 # Cargo doesn't inherit a dependency's patches, so Rune's own list is repeated
 # here (Rune's README, "Depending on Rune").

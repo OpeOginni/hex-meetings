@@ -1,24 +1,20 @@
 //! Meetings: the calls Hex recorded, grouped by day, beside the open one:
-//! its details, Hex's own summary, the recipe bar, the last recipe result,
-//! and the transcript as speaker turns.
+//! its details, Hex's own summary, the report bar, the last report result,
+//! what to do with the call afterwards, and the transcript as speaker turns.
 
 use rune::{El, ScrollSpec, col, el, icon, row, spacer, text};
-use rune_kit::{Button, ButtonVariant, ControlSize, IconButton, IconButtonVariant, Kit, Markdown, Spinner, TextInput};
+use rune_kit::{Button, ButtonVariant, ControlSize, Kit, Markdown, Spinner, TextInput};
 use rune_theme_opencode::icons as oc;
 
-use super::{Tone, header, notice, outcome_tone, tag};
+use super::{Tone, notice, outcome_tone, tag};
 use crate::app::{App, HexStatus};
 use crate::hex::{self, Meeting};
 
 const LIST_W: f32 = 300.0;
 
-pub fn page(s: &App, k: &Kit, hair: f32) -> El {
-    if s.hex == Some(HexStatus::Missing) {
-        return empty(
-            k,
-            "Hex isn't installed",
-            "Hex Meetings reads the calls Hex records. Install Hex from anoma.ly/hex, turn on Labs › Meetings, and record a call.",
-        );
+pub fn page(s: &App, k: &Kit, hair: f32, layer: &mut Vec<El>) -> El {
+    if s.hex == Some(HexStatus::Missing) || (s.meetings_loaded && s.meetings.is_empty() && s.list_error.is_none()) {
+        return super::start::page(s, k, hair, layer);
     }
     row()
         .key("meetings")
@@ -28,20 +24,6 @@ pub fn page(s: &App, k: &Kit, hair: f32) -> El {
         .child(list(s, k))
         .child(el().w(hair).h_full().fill(k.c.border_weak))
         .child(detail(s, k))
-}
-
-fn empty(k: &Kit, title: &str, body: &str) -> El {
-    col()
-        .key("empty")
-        .w_full()
-        .h_full()
-        .center()
-        .gap(8.0)
-        .padding(40.0)
-        .window_drag()
-        .child(icon(&oc::WAVEFORM, 28.0).color(k.c.icon_faint))
-        .child(text(title).font(super::HEADING).color(k.c.text_strong))
-        .child(text(body).font(k.ty.ui).color(k.c.text_muted).wrap().max_w(380.0).align(rune::Align::Center))
 }
 
 fn status_tag(k: &Kit, m: &Meeting) -> Option<El> {
@@ -61,11 +43,15 @@ fn capitalize(s: &str) -> String {
 
 fn list(s: &App, k: &Kit) -> El {
     let c = &k.c;
-    let search = TextInput::new(&s.search)
+    let mut search = TextInput::new(&s.search)
         .placeholder("Search titles and apps")
         .leading_icon(&oc::MAGNIFYING_GLASS)
         .width(Some(LIST_W - 24.0))
-        .on_edit(|s: &mut App| &mut s.search)
+        .on_edit(|s: &mut App| &mut s.search);
+    if !s.search.text.is_empty() {
+        search = search.clear_button().on_action(|s: &mut App, _| s.search = rune::TextEdit::new(""));
+    }
+    let search = search
         .build(k)
         .key("search");
     let today = crate::time::today();
@@ -123,7 +109,13 @@ fn list(s: &App, k: &Kit) -> El {
                         .min_w(0.0)
                         .gap(2.0)
                         .child(title_row)
-                        .child(text(meta).font(k.ty.small).color(c.text_muted).truncate()),
+                        .child(
+                            row()
+                                .gap(5.0)
+                                .center_y()
+                                .children(m.application.as_deref().map(|app| super::mark(k, super::logos::call_app(app).unwrap_or((&super::logos::CALL, None)), 12.0)))
+                                .child(text(meta).font(k.ty.small).color(c.text_muted).truncate().shrink().min_w(0.0)),
+                        ),
                 )
                 .child(text(crate::time::clock(m.timestamp_ms)).font(k.ty.small).color(c.text_faint)),
         );
@@ -132,15 +124,21 @@ fn list(s: &App, k: &Kit) -> El {
         col().w_full().pt(24.0).center().child(Spinner::new().build(k))
     } else if let Some(e) = &s.list_error {
         col().w_full().px(10.0).pt(8.0).child(text(e.clone()).font(k.ty.small).color(c.danger.fg).wrap())
-    } else if s.meetings.is_empty() {
-        col().w_full().px(10.0).pt(8.0).child(
-            text("No meetings yet. Turn on Labs › Meetings in Hex and record a call; it shows up here when it ends.")
-                .font(k.ty.small)
-                .color(c.text_muted)
-                .wrap(),
-        )
     } else if visible.is_empty() {
-        col().w_full().px(10.0).pt(8.0).child(text("No meeting matches.").font(k.ty.small).color(c.text_muted))
+        super::empty_small(
+            k,
+            "search-empty",
+            &oc::MAGNIFYING_GLASS,
+            &format!("No meeting matches \u{201c}{}\u{201d}", s.search.text.trim()),
+            Some(
+                Button::new("Clear search")
+                    .variant(ButtonVariant::Neutral)
+                    .control_size(ControlSize::Small)
+                    .on_press(|s: &mut App| s.search = rune::TextEdit::new(""))
+                    .build(k)
+                    .key("clear-search"),
+            ),
+        )
     } else {
         rows
     };
@@ -165,7 +163,7 @@ fn detail(s: &App, k: &Kit) -> El {
             .h_full()
             .min_h(0.0)
             .child(row().w_full().h(40.0).window_drag())
-            .child(col().key("detail-scroll").w_full().grow(1.0).min_h(0.0).px(32.0).pb(32.0).child(content).scroll(ScrollSpec { stick_bottom: false }))
+            .child(col().key("detail-scroll").w_full().grow(1.0).min_h(0.0).px(32.0).pt(4.0).pb(32.0).child(content).scroll(ScrollSpec { stick_bottom: false }))
     };
     let Some(m) = s.selected_meeting() else {
         if s.meetings.is_empty() {
@@ -180,15 +178,17 @@ fn detail(s: &App, k: &Kit) -> El {
     }
     let mut body = col().key(format!("detail-{}", m.id)).w_full().gap(20.0);
     let copy = s.detail.as_ref().map(|d| hex::transcript_text(&d.entries)).unwrap_or_default();
-    body = body.child(header(
+    let app_logo = m.application.as_deref().and_then(super::logos::call_app).map(|mk| super::mark(k, mk, 16.0));
+    body = body.child(super::header_with(
         k,
         &m.title,
+        app_logo,
         &meta.join(" · "),
         vec![
-            IconButton::new(&oc::OUTLINE_COPY)
-                .variant(IconButtonVariant::Ghost)
-                .label("Copy transcript")
-                .help("Copy transcript")
+            Button::new("Copy transcript")
+                .icon(&oc::OUTLINE_COPY)
+                .variant(ButtonVariant::Neutral)
+                .control_size(ControlSize::Small)
                 .disabled(copy.is_empty())
                 .on_press_tx(move |_: &mut App, tx| tx.copy(copy.clone()))
                 .build(k)
@@ -211,19 +211,22 @@ fn detail(s: &App, k: &Kit) -> El {
                 .child(text(notes.summary.clone()).font(k.ty.body).color(c.text_base).wrap().selectable(true)),
         );
     }
-    body = body.child(recipe_bar(s, k, m));
+    body = body.child(report_bar(s, k, m));
     if let Some(run) = s.last_run(&m.id) {
-        body = body.child(result(k, run));
+        body = body.child(result(s, k, run));
+        if run.outcome == crate::activity::Outcome::Done && !s.is_settled(&m.id) {
+            body = body.child(afterwards(s, k, m));
+        }
     }
     body = body.child(transcript(s, k));
     shell(body)
 }
 
-/// Recipes as buttons; a press asks where the call goes before anything runs.
-fn recipe_bar(s: &App, k: &Kit, m: &Meeting) -> El {
+/// Reports as buttons; a press asks where the call goes before anything runs.
+fn report_bar(s: &App, k: &Kit, m: &Meeting) -> El {
     let c = &k.c;
     let card = col()
-        .key("recipe-bar")
+        .key("report-bar")
         .w_full()
         .gap(10.0)
         .padding(14.0)
@@ -232,80 +235,117 @@ fn recipe_bar(s: &App, k: &Kit, m: &Meeting) -> El {
         .border(1.0, c.border_weak);
     if let Some(r) = &s.running {
         let secs = r.started.elapsed().as_secs();
-        let here = r.meeting_id == m.id;
-        let label = if here {
-            format!("Running {}… {}", r.recipe, hex::clock(secs * 1000))
-        } else {
-            format!("Running {} on another meeting… {}", r.recipe, hex::clock(secs * 1000))
-        };
+        let agent = s.report_by_name(&r.report).and_then(|rep| s.plan(rep).ok()).and_then(|p| p.agent);
+        let elsewhere = (r.meeting_id != m.id).then(|| text("on another call").font(k.ty.small).color(c.text_faint));
         return card.child(
             row()
                 .gap(10.0)
                 .center_y()
                 .child(Spinner::new().size(14.0).build(k))
-                .child(text(label).font(k.ty.ui).color(c.text_base).grow(1.0))
+                .children(agent.and_then(|id| super::agent_logo(k, id, 16.0)))
+                .child(text(r.report.clone()).font(k.ty.ui_medium).color(c.text_base))
+                .children(elsewhere)
+                .child(spacer())
+                .child(text(hex::clock(secs * 1000)).font(k.ty.small).color(c.text_faint))
                 .child(Button::new("Stop").variant(ButtonVariant::Neutral).on_press(|s: &mut App| s.stop_run()).build(k).key("stop")),
         );
     }
-    if let Some(recipe) = s.armed.as_deref().and_then(|id| s.recipe(id)) {
-        return card
-            .child(text(format!("Run “{}” on this call?", recipe.name)).font(k.ty.ui_medium).color(c.text_strong))
-            .child(
+    if let Some(report) = s.armed.as_deref().and_then(|id| s.report(id)) {
+        let plan = s.plan(report);
+        let mut card = card.child(text(format!("Run “{}” on this call?", report.name)).font(k.ty.ui_medium).color(c.text_strong));
+        card = match &plan {
+            Ok(plan) => {
+                let mut runs = format!("Runs {}", plan.runs);
+                if plan.tools {
+                    runs.push_str(", which may use its connected tools without asking you");
+                }
+                card.child(
+                    row()
+                        .gap(6.0)
+                        .center_y()
+                        .child(icon(&oc::SHIELD, 14.0).color(c.icon_muted))
+                        .child(text(format!("The transcript goes to {}.", lower_first(&plan.sends_to))).font(k.ty.ui).color(c.text_muted).wrap().shrink().min_w(0.0)),
+                )
+                .child(
+                    row()
+                        .gap(6.0)
+                        .center_y()
+                        .children(plan.agent.and_then(|id| super::agent_logo(k, id, 14.0)))
+                        .child(text(runs).font(k.ty.small).color(c.text_faint).wrap().shrink().min_w(0.0)),
+                )
+            }
+            Err(e) => card.child(text(e.clone()).font(k.ty.ui).color(c.danger.fg).wrap()),
+        };
+        card = match report.to.filter(|to| s.connection(*to).is_none()) {
+            Some(to) => card.child(
                 row()
                     .gap(6.0)
                     .center_y()
-                    .child(icon(&oc::SHIELD, 14.0).color(c.icon_muted))
-                    .child(text(format!("The transcript goes to: {}", recipe.sends_to)).font(k.ty.ui).color(c.text_muted).wrap().shrink().min_w(0.0)),
-            )
-            .child(
-                text(format!("Runs {}", recipe.command.first().map(String::as_str).unwrap_or("?")))
-                    .font(k.ty.small)
-                    .color(c.text_faint),
-            )
-            .child(
-                row()
-                    .gap(8.0)
-                    .child(spacer())
-                    .child(Button::new("Cancel").variant(ButtonVariant::Ghost).on_press(|s: &mut App| s.armed = None).build(k).key("cancel"))
-                    .child(
-                        Button::new("Send")
-                            .variant(ButtonVariant::Contrast)
-                            .disabled(s.detail.is_none())
-                            .on_press(|s: &mut App| s.run_armed())
-                            .build(k)
-                            .key("send"),
-                    ),
-            );
+                    .child(icon(&oc::WARNING, 14.0).color(c.warning.icon))
+                    .child(text(format!("{} isn't connected yet. Connect it in Setup before posting.", to.name())).font(k.ty.small).color(c.text_muted).wrap().shrink().min_w(0.0)),
+            ),
+            None => card,
+        };
+        return card.child(
+            row()
+                .gap(8.0)
+                .child(spacer())
+                .child(Button::new("Cancel").variant(ButtonVariant::Neutral).on_press(|s: &mut App| s.armed = None).build(k).key("cancel"))
+                .child(
+                    Button::new("Run")
+                        .variant(ButtonVariant::Submit)
+                        .disabled(s.detail.is_none() || plan.is_err())
+                        .on_press(|s: &mut App| s.run_armed())
+                        .build(k)
+                        .key("send"),
+                ),
+        );
     }
-    let mut buttons = row().key("recipes").w_full().gap(8.0).flex_wrap();
-    for r in &s.recipes {
+    let mut buttons = row().key("reports").w_full().gap(8.0).flex_wrap();
+    // The built-in Summary first, then the person's own reports.
+    for r in std::iter::once(crate::reports::builtin()).chain(&s.reports) {
         let id = r.id.clone();
         buttons = buttons.child(
             Button::new(r.name.clone())
+                .icon(super::reports::report_mark(s, r).0)
                 .variant(ButtonVariant::Neutral)
                 .control_size(ControlSize::Small)
                 .help(r.description.clone())
                 .disabled(s.detail.is_none())
                 .on_press(move |s: &mut App| s.armed = Some(id.clone()))
                 .build(k)
-                .key(format!("recipe-{}", r.id)),
+                .key(format!("report-{}", r.id)),
         );
     }
-    let hint = if s.recipes.is_empty() {
-        "No recipes. Add one in the Recipes page."
-    } else {
-        "Hand this call to your own agent. You'll see where it goes before it's sent."
-    };
-    card.child(text("Send to").font(k.ty.small_medium).color(c.text_faint))
-        .child(buttons)
-        .child(text(hint).font(k.ty.small).color(c.text_faint).wrap())
+    buttons = buttons.child(
+        Button::new("New report\u{2026}")
+            .icon(&oc::PLUS_SMALL)
+            .variant(ButtonVariant::Neutral)
+            .control_size(ControlSize::Small)
+            .help("Make a report: what to look for, and where it goes")
+            .on_press(|s: &mut App| {
+                s.go(crate::app::Page::Reports);
+                s.new_report();
+            })
+            .build(k)
+            .key("new-report-from-call"),
+    );
+    // Only a new user needs telling what a report is for.
+    let hint = s.reports.is_empty().then(|| text("Make a report to send calls to Slack, Notion or a tracker.").font(k.ty.small).color(c.text_faint).wrap());
+    card.child(text("Reports").font(k.ty.small_medium).color(c.text_faint)).child(buttons).children(hint)
 }
 
-fn result(k: &Kit, run: &crate::activity::Run) -> El {
+fn lower_first(s: &str) -> String {
+    let mut c = s.chars();
+    c.next().map(|f| f.to_lowercase().collect::<String>() + c.as_str()).unwrap_or_default()
+}
+
+fn result(s: &App, k: &Kit, run: &crate::activity::Run) -> El {
     let c = &k.c;
     let output = run.output.clone();
     let when = crate::time::long(run.at_ms);
-    col()
+    let at = run.at_ms;
+    let mut out = col()
         .key("last-run")
         .w_full()
         .gap(10.0)
@@ -313,32 +353,258 @@ fn result(k: &Kit, run: &crate::activity::Run) -> El {
             row()
                 .gap(8.0)
                 .center_y()
-                .child(text(run.recipe.clone()).font(k.ty.ui_medium).color(c.text_strong))
-                .child(tag(k, run.outcome.label(), outcome_tone(run.outcome)))
+                .children(crate::agents::AGENTS.iter().find(|a| a.program == run.program).and_then(|a| super::agent_logo(k, a.id, 16.0)))
+                .child(text(run.report.clone()).font(k.ty.ui_medium).color(c.text_strong))
+                .child(if run.awaits_post() { tag(k, "Ready to post", Tone::Busy) } else { tag(k, run.outcome.label(), outcome_tone(run.outcome)) })
                 .child(text(when).font(k.ty.small).color(c.text_faint).grow(1.0))
-                .child(
-                    IconButton::new(&oc::OUTLINE_COPY)
-                        .variant(IconButtonVariant::Ghost)
-                        .label("Copy result")
-                        .help("Copy result")
+                .children(matches!(run.outcome, crate::activity::Outcome::Failed | crate::activity::Outcome::Stopped).then(|| {
+                    Button::new("Try again")
+                        .icon(&oc::REFRESH)
+                        .variant(ButtonVariant::Submit)
+                        .control_size(ControlSize::Small)
+                        .on_press(move |s: &mut App| s.retry(at))
+                        .build(k)
+                        .key("retry-run")
+                }))
+                // A failed run's text is the error, not a result to keep.
+                .children((run.outcome != crate::activity::Outcome::Failed).then(|| {
+                    Button::new("Save")
+                        .icon(&oc::DOWNLOAD)
+                        .variant(ButtonVariant::Neutral)
+                        .control_size(ControlSize::Small)
+                        .help(format!("Save as Markdown in {}", crate::paths::tilde(&crate::paths::summaries_dir())))
+                        .disabled(run.output.is_empty())
+                        .on_press(move |s: &mut App| s.save_result(at))
+                        .build(k)
+                        .key("save-result")
+                }))
+                .children((run.outcome != crate::activity::Outcome::Failed).then(|| {
+                    Button::new("Copy")
+                        .icon(&oc::OUTLINE_COPY)
+                        .variant(ButtonVariant::Neutral)
+                        .control_size(ControlSize::Small)
                         .on_press_tx(move |_: &mut App, tx| tx.copy(output.clone()))
                         .build(k)
-                        .key("copy-result"),
-                ),
+                        .key("copy-result")
+                })),
         )
-        .child(
-            col()
+        .child(match delivery(s, k, run) {
+            // A result to post shows as what will be posted, not as the raw reply.
+            Some(panel) => panel,
+            None => col()
                 .w_full()
                 .padding(14.0)
                 .radius(k.radius.lg)
                 .fill(c.layer_01)
                 .child(Markdown::new(if run.output.is_empty() { "(no output)".to_string() } else { run.output.clone() }).selectable(true).build(k)),
-        )
+        });
+    if let Some((_, path)) = s.saved.as_ref().filter(|(saved_at, _)| *saved_at == at) {
+        let file = path.clone();
+        out = out.child(
+            row()
+                .key("saved")
+                .gap(8.0)
+                .center_y()
+                .child(icon(&oc::CHECK_SMALL, 14.0).color(c.success.icon))
+                .child(
+                    text(format!("Saved to {}", path.parent().and_then(|p| p.file_name()).map(|n| n.to_string_lossy().to_string()).unwrap_or_default()))
+                        .font(k.ty.small)
+                        .color(c.text_muted)
+                        .help(crate::paths::tilde(path))
+                        .truncate()
+                        .shrink()
+                        .min_w(0.0),
+                )
+                .child(
+                    Button::new("Show in Finder")
+                        .icon(&oc::FOLDER)
+                        .variant(ButtonVariant::Neutral)
+                        .control_size(ControlSize::Small)
+                        .on_press(move |_: &mut App| crate::app::reveal_file(&file))
+                        .build(k)
+                        .key("show-saved"),
+                ),
+        );
+    }
+    out
+}
+
+/// Slack's own formatting (*bold*, _italic_) as Markdown, so the preview
+/// reads as the message will in Slack.
+fn slack_to_markdown(text: &str) -> String {
+    let mut out = String::new();
+    for line in text.lines() {
+        // Slack's *bold* is Markdown's **bold**; an odd * is left as typed.
+        let line = if line.matches('*').count() % 2 == 0 { line.replace('*', "**") } else { line.to_string() };
+        let line = line.strip_prefix("\u{2022} ").map_or(line.clone(), |rest| format!("- {rest}"));
+        out.push_str(&line);
+        // Each Slack line is its own line.
+        out.push_str("  \n");
+    }
+    out
+}
+
+#[cfg(test)]
+#[test]
+fn slack_formatting_reads_as_markdown() {
+    assert_eq!(slack_to_markdown("*Call* (34 min)\n\u{2022} You: send *it*\n2 * 3"), "**Call** (34 min)  \n- You: send **it**  \n2 * 3  \n");
+}
+
+/// What a result will post, as it will read there: the Slack message, the
+/// Notion page, or the issues.
+fn preview(k: &Kit, to: crate::places::To, output: &str) -> El {
+    use crate::places::{Place, To, parse_issues};
+    let c = &k.c;
+    match to {
+        To::Place(Place::Slack) => Markdown::new(slack_to_markdown(output.trim())).selectable(true).build(k),
+        To::Place(Place::Notion) => Markdown::new(output.trim().to_string()).selectable(true).build(k),
+        _ => match parse_issues(output) {
+            Ok(issues) if issues.is_empty() => text("The agent found nothing to file.").font(k.ty.ui).color(c.text_muted),
+            Ok(issues) => {
+                let mut list = col().w_full().gap(10.0);
+                for issue in issues {
+                    list = list.child(
+                        col()
+                            .w_full()
+                            .gap(2.0)
+                            .child(text(issue.title).font(k.ty.ui_medium).color(c.text_base).wrap())
+                            .child(text(issue.body).font(k.ty.small.lh(18.0)).color(c.text_muted).wrap().selectable(true)),
+                    );
+                }
+                list
+            }
+            Err(e) => text(e).font(k.ty.ui).color(c.danger.fg).wrap(),
+        },
+    }
+}
+
+/// A finished result that Hex Meetings posts: what it will post, then Post /
+/// Don't post, or what happened. None for a result that only shows on the call.
+fn delivery(s: &App, k: &Kit, run: &crate::activity::Run) -> Option<El> {
+    use crate::activity::{Delivery, Outcome};
+    use crate::places::To;
+    let c = &k.c;
+    let to = run.to.as_deref().and_then(To::parse).filter(|_| run.outcome == Outcome::Done)?;
+    let at = run.at_ms;
+    let small = |label: &str, key: &str, variant: ButtonVariant, f: fn(&mut App, i64)| {
+        Button::new(label.to_string()).variant(variant).control_size(ControlSize::Small).on_press(move |s: &mut App| f(s, at)).build(k).key(key.to_string())
+    };
+    let place_logo = s.connection(to).map(|c| super::logos::for_place(c.place)).or(match to {
+        To::Place(p) => Some(super::logos::for_place(p)),
+        To::Issues => None,
+    });
+    let status = |glyph: Option<El>, words: String| {
+        row().gap(8.0).center_y().grow(1.0).shrink().min_w(0.0).children(glyph).child(text(words).font(k.ty.small).color(c.text_muted).wrap().shrink().min_w(0.0))
+    };
+    let logo = || place_logo.map(|m| super::mark(k, m, 14.0));
+    let bar = match &run.delivery {
+        Some(Delivery::Posted { to, links }) => {
+            let mut bar = row().w_full().gap(8.0).center_y().child(status(Some(icon(&oc::CHECK_SMALL, 14.0).color(c.success.icon)), format!("Posted to {to}")));
+            for (i, link) in links.iter().enumerate() {
+                let url = link.clone();
+                let label = if links.len() == 1 { "Open".to_string() } else { format!("Open {}", i + 1) };
+                bar = bar.child(
+                    Button::new(label)
+                        .icon(&oc::ARROW_UP_RIGHT)
+                        .variant(ButtonVariant::Neutral)
+                        .control_size(ControlSize::Small)
+                        .help(link.clone())
+                        .on_press(move |_: &mut App| crate::app::reveal(&url))
+                        .build(k)
+                        .key(format!("open-link-{i}")),
+                );
+            }
+            bar
+        }
+        Some(Delivery::Skipped) => row().w_full().child(status(None, "Not posted.".into())),
+        Some(Delivery::Failed { to, error }) => row()
+            .w_full()
+            .gap(8.0)
+            .center_y()
+            .child(status(Some(icon(&oc::WARNING, 14.0).color(c.warning.icon)), format!("Couldn't post to {to}. {error}")))
+            .child(small("Don't post", "skip-post", ButtonVariant::Neutral, App::skip_post))
+            .child(small("Try again", "retry-post", ButtonVariant::Submit, App::retry_post)),
+        None if s.posting == Some(at) => row().w_full().gap(8.0).center_y().child(Spinner::new().size(14.0).build(k)).child(status(None, "Posting\u{2026}".into())),
+        None => match s.connection(to) {
+            Some(conn) => row()
+                .w_full()
+                .gap(8.0)
+                .center_y()
+                .child(status(logo(), format!("Goes to {}", conn.label())))
+                .child(small("Don't post", "skip-post", ButtonVariant::Neutral, App::skip_post))
+                .child(small("Post", "post", ButtonVariant::Submit, App::post_result)),
+            None => row()
+                .w_full()
+                .gap(8.0)
+                .center_y()
+                .child(status(logo(), format!("Connect {} to post this.", to.name())))
+                .child(small("Don't post", "skip-post", ButtonVariant::Neutral, App::skip_post))
+                .child(
+                    Button::new("Open Setup")
+                        .variant(ButtonVariant::Submit)
+                        .control_size(ControlSize::Small)
+                        .on_press(|s: &mut App| s.go(crate::app::Page::Setup))
+                        .build(k)
+                        .key("open-setup"),
+                ),
+        },
+    };
+    Some(col().key("delivery").w_full().gap(14.0).padding(14.0).radius(k.radius.lg).fill(c.layer_01).child(preview(k, to, &run.output)).child(bar))
+}
+
+/// After a result: keep the call in Hex until its own time is up, or delete it in Hex now.
+fn afterwards(s: &App, k: &Kit, m: &Meeting) -> El {
+    let c = &k.c;
+    let small = |label: &str, key: &str, f: Box<dyn Fn(&mut App)>| {
+        Button::new(label.to_string()).variant(ButtonVariant::Neutral).control_size(ControlSize::Small).on_press(f).build(k).key(key.to_string())
+    };
+    let (keep_id, del_id) = (m.id.clone(), m.id.clone());
+    let keep = move |s: &mut App| s.keep_call(&keep_id);
+    let line = if s.deleting.as_deref() == Some(m.id.as_str()) {
+        "Hex is open at Meetings: delete this call there.".to_string()
+    } else {
+        match &s.overview {
+            Some(Ok(o)) => format!("Done with this call? {}", hex::retention_sentence(o.retention())),
+            _ => "Done with this call? Hex keeps it as its settings say.".to_string(),
+        }
+    };
+    let mut actions = row().gap(8.0);
+    actions = if s.deleting.as_deref() == Some(m.id.as_str()) {
+        actions.child(small("Cancel", "keep", Box::new(keep)))
+    } else {
+        actions.child(small("Keep", "keep", Box::new(keep))).child(small("Delete in Hex\u{2026}", "delete-in-hex", Box::new(move |s: &mut App| s.delete_in_hex(&del_id))))
+    };
+    row()
+        .key("afterwards")
+        .w_full()
+        .gap(12.0)
+        .px(14.0)
+        .py(10.0)
+        .center_y()
+        .radius(k.radius.lg)
+        .border(1.0, c.border_weak)
+        .child(icon(&oc::ARCHIVE, 16.0).color(c.icon_muted))
+        .child(text(line).font(k.ty.small.lh(18.0)).color(c.text_muted).wrap().grow(1.0).shrink().min_w(0.0))
+        .child(actions)
+}
+
+/// Who's speaking: your microphone, or the people on the call, shown with
+/// the call app's logo when Hex knows it.
+fn avatar(k: &Kit, mine: bool, app: Option<&str>) -> El {
+    let c = &k.c;
+    let dot = el().size(28.0, 28.0).radius(14.0).center();
+    if mine {
+        return dot.fill(c.info.bg).child(icon(&oc::WAVEFORM, 14.0).color(c.info.icon));
+    }
+    match app.and_then(super::logos::call_app) {
+        Some(logo) => dot.fill(c.bg_base).border(1.0, c.border_weak).child(super::mark(k, logo, 15.0)),
+        None => dot.fill(c.layer_02).child(icon(&oc::SPEECH_BUBBLE, 14.0).color(c.icon_muted)),
+    }
 }
 
 fn transcript(s: &App, k: &Kit) -> El {
     let c = &k.c;
-    let mut out = col().key("transcript").w_full().gap(14.0).child(text("Transcript").font(k.ty.small_medium).color(c.text_faint));
+    let mut out = col().key("transcript").w_full().gap(20.0).child(text("Transcript").font(k.ty.small_medium).color(c.text_faint));
     if let Some(e) = &s.detail_error {
         return out.child(text(e.clone()).font(k.ty.ui).color(c.danger.fg).wrap());
     }
@@ -346,25 +612,27 @@ fn transcript(s: &App, k: &Kit) -> El {
         return out.child(row().child(Spinner::new().size(14.0).build(k)));
     };
     if d.entries.is_empty() {
-        return out.child(text("No transcript yet.").font(k.ty.ui).color(c.text_muted));
+        let still = d.meeting.in_progress || matches!(d.meeting.status.as_str(), "recording" | "starting" | "transcribing");
+        let line = if still { "Hex is still transcribing this call. It shows up here as it does." } else { "Hex didn't hear anything in this call." };
+        return out.child(super::empty_small(k, "transcript-empty", &oc::WAVEFORM, line, None));
     }
-    for (i, e) in d.entries.iter().enumerate() {
-        let mine = e.source == "microphone";
-        out = out.child(
+    // One block per change of speaker: the avatar and name once, then each
+    // thing they said as its own paragraph (its time shows on hover).
+    let app = s.selected_meeting().and_then(|m| m.application.as_deref());
+    for (i, turns) in d.entries.chunk_by(|a, b| a.source == b.source).enumerate() {
+        let first = &turns[0];
+        let mine = first.source == "microphone";
+        let mut said = col().grow(1.0).shrink().min_w(0.0).gap(6.0).child(
             row()
-                .key(format!("turn-{i}"))
-                .w_full()
-                .gap(14.0)
-                .items_start()
-                .child(
-                    col()
-                        .w(56.0)
-                        .gap(1.0)
-                        .child(text(e.speaker()).font(k.ty.small_medium).color(if mine { c.text_accent } else { c.text_base }))
-                        .child(text(hex::clock(e.start_ms)).font(k.ty.text_xsmall).color(c.text_faint)),
-                )
-                .child(text(e.text.trim().to_string()).font(k.ty.body).color(c.text_base).wrap().selectable(true).grow(1.0).shrink().min_w(0.0)),
+                .gap(8.0)
+                .center_y()
+                .child(text(first.speaker()).font(k.ty.ui_medium).color(if mine { c.text_accent } else { c.text_strong }))
+                .child(text(hex::clock(first.start_ms)).font(k.ty.text_xsmall).color(c.text_faint)),
         );
+        for e in turns {
+            said = said.child(text(e.text.trim().to_string()).font(k.ty.body).color(c.text_base).wrap().selectable(true).help(hex::clock(e.start_ms)));
+        }
+        out = out.child(row().key(format!("turn-{i}")).w_full().gap(12.0).items_start().child(avatar(k, mine, app)).child(said));
     }
     out
 }

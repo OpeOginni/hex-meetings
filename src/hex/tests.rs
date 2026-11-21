@@ -66,6 +66,16 @@ fn the_installed_hex_answers_in_the_format_this_app_reads() {
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     assert_eq!(parse_list(&String::from_utf8(out.stdout).unwrap()).unwrap(), Vec::new());
     let _ = std::fs::remove_dir_all(&dir);
+    // Only a setting's value; Hex answers this only while it's running.
+    // Settings and models: Hex answers these only while it's running.
+    match (meetings_enabled(&hex), overview(&hex)) {
+        (Ok(_), Ok(o)) => {
+            assert!(o.settings.contains_key("meetings.retention"), "{:?}", o.settings.keys());
+            assert!(o.models.iter().any(|m| m.selected), "no selected speech model");
+        }
+        (Ok(_), Err(e)) => panic!("Hex is running but its overview didn't read: {e}"),
+        (Err(e), _) => assert!(!e.contains("unexpected format"), "{e}"),
+    }
 }
 
 #[test]
@@ -75,4 +85,27 @@ fn formats_times_and_lengths() {
     assert_eq!(duration(45_000), "45 s");
     assert_eq!(duration(12 * 60_000), "12 min");
     assert_eq!(duration(65 * 60_000), "1 h 05 min");
+}
+
+#[test]
+fn reads_hex_meeting_settings_and_models() {
+    let settings = parse_settings(
+        r#"{"version": 4, "status": "settings", "settings": [
+            {"key": "meetings.enabled", "value": true, "kind": "bool", "writable": true},
+            {"key": "meetings.retention", "value": "week", "kind": "choice", "choices": ["day", "week", "month", "forever"], "writable": true},
+            {"key": "meetings.output_folder", "value": null, "kind": "path", "writable": true}]}"#,
+    )
+    .unwrap();
+    let models = vec![crate::speech::SpeechModel {
+        id: "parakeet_unified_en".into(),
+        name: "Parakeet Unified English".into(),
+        languages: vec!["en".into()],
+        size: "731 MB".into(),
+        installed: true,
+        selected: true,
+    }];
+    let o = Overview { settings, models };
+    assert_eq!(o.retention(), Some("week"));
+    assert!(matches!(crate::speech::fit(&o.models, "en"), crate::speech::Fit::Fits(m) if m.id == "parakeet_unified_en"));
+    assert!(retention_sentence(None).contains("24 hours"));
 }

@@ -1,13 +1,16 @@
-//! Reads meetings through Hex's public, read-only command line
-//! (`hex meetings list|show --json`, JSON version 1). Hex documents these
-//! reads as never starting the app, opening the microphone, or writing
-//! anything, so calling them is always safe. Nothing here reads Hex's
-//! internal files directly: the CLI is the stable contract.
+//! Talks to Hex through its public command line, never its files. Meetings
+//! are read with `hex meetings list|show --json` (JSON version 1), which Hex
+//! documents as never starting the app, opening the microphone, or writing
+//! anything. Only on the person's request: `hex settings` for how long Hex
+//! keeps calls, and `hex window show meetings` to delete one in Hex.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use serde::Deserialize;
+
+use crate::speech::SpeechModel;
 
 /// Where to find the `hex` binary: `HEX_MEETINGS_HEX`, then `hex` on the
 /// PATH (or the usual install folders), then the app bundle.
@@ -115,6 +118,113 @@ pub fn list(hex: &Path) -> Result<Vec<Meeting>, String> {
 
 pub fn show(hex: &Path, id: &str) -> Result<Detail, String> {
     parse_show(&run(hex, &["meetings", "show", id, "--json"])?)
+}
+
+/// Where people download Hex (Apple silicon, macOS 15 or later).
+pub const DOWNLOAD_PAGE: &str = "https://anoma.ly/hex";
+
+/// Settings by key from `hex settings get <key or prefix> --json`. Hex
+/// answers settings only while it's running.
+fn settings(hex: &Path, key: &str) -> Result<BTreeMap<String, serde_json::Value>, String> {
+    parse_settings(&run(hex, &["settings", "get", key, "--json"])?)
+}
+
+pub fn parse_settings(json: &str) -> Result<BTreeMap<String, serde_json::Value>, String> {
+    #[derive(Deserialize)]
+    struct Setting {
+        key: String,
+        #[serde(default)]
+        value: serde_json::Value,
+    }
+    #[derive(Deserialize)]
+    struct Reply {
+        settings: Vec<Setting>,
+    }
+    let reply: Reply = serde_json::from_str(json).map_err(|e| format!("Hex answered in an unexpected format: {e}"))?;
+    Ok(reply.settings.into_iter().map(|s| (s.key, s.value)).collect())
+}
+
+/// Whether Labs › Meetings is on, so Hex records calls.
+pub fn meetings_enabled(hex: &Path) -> Result<bool, String> {
+    settings(hex, "meetings.enabled")?.get("meetings.enabled").and_then(|v| v.as_bool()).ok_or_else(|| "Hex didn't say whether Meetings is on.".into())
+}
+
+/// Hex's meeting settings and speech models, for the Setup page and the
+/// language check. Read-only.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Overview {
+    /// Every `meetings.*` setting.
+    pub settings: BTreeMap<String, serde_json::Value>,
+    pub models: Vec<SpeechModel>,
+}
+
+impl Overview {
+    fn text(&self, key: &str) -> Option<&str> {
+        self.settings.get(key).and_then(|v| v.as_str())
+    }
+
+    /// `day`, `week`, `month` or `forever`; None while unset.
+    pub fn retention(&self) -> Option<&str> {
+        self.text("meetings.retention")
+    }
+
+    /// Whether Labs › More call apps is on; None when Hex didn't say.
+    pub fn more_call_apps(&self) -> Option<bool> {
+        self.settings.get("labs.more_call_apps").and_then(|v| v.as_bool())
+    }
+
+}
+
+pub fn overview(hex: &Path) -> Result<Overview, String> {
+    #[derive(Deserialize)]
+    struct Models {
+        models: Vec<SpeechModel>,
+    }
+    let models: Models = serde_json::from_str(&run(hex, &["model", "list", "--json"])?).map_err(|e| format!("Hex listed its models in an unexpected format: {e}"))?;
+    let mut all = settings(hex, "meetings")?;
+    // Whether Labs › More call apps is on; an older Hex may not have it.
+    if let Ok(labs) = settings(hex, "labs.more_call_apps") {
+        all.extend(labs);
+    }
+    Ok(Overview { settings: all, models: models.models })
+}
+
+/// Opens Hex's settings with the speech model picker.
+pub fn open_models(hex: &Path) -> Result<(), String> {
+    run(hex, &["start"])?;
+    run(hex, &["window", "show", "models"]).map(drop)
+}
+
+/// Opens Hex if needed, turns on Labs › Meetings, and shows Hex's Meetings
+/// pane, where Hex asks for the microphone and system audio.
+pub fn turn_on_meetings(hex: &Path) -> Result<(), String> {
+    run(hex, &["start"])?;
+    run(hex, &["labs", "on", "meetings"])?;
+    run(hex, &["window", "show", "meetings"]).map(drop)
+}
+
+/// Changes how long Hex keeps finished meetings, as Hex's own window would.
+pub fn set_retention(hex: &Path, value: &str) -> Result<(), String> {
+    run(hex, &["settings", "set", "meetings.retention", value]).map(drop)
+}
+
+/// What Hex does with a finished call, for a given `meetings.retention`.
+pub fn retention_sentence(value: Option<&str>) -> &'static str {
+    match value {
+        Some("day") => "Hex keeps it for a day, then moves it to the Trash.",
+        Some("week") => "Hex keeps it for a week, then moves it to the Trash.",
+        Some("month") => "Hex keeps it for a month, then moves it to the Trash.",
+        Some("forever") => "Hex keeps it until you delete it.",
+        // Unset: Hex keeps new meetings 24 hours (its settings say so).
+        _ => "Hex keeps it for 24 hours, then moves it to the Trash.",
+    }
+}
+
+/// Opens Hex (if needed) on its Meetings pane: where a call is deleted (Hex's
+/// command line has no delete) and the rest of Hex's meeting settings are.
+pub fn open_meetings(hex: &Path) -> Result<(), String> {
+    run(hex, &["start"])?;
+    run(hex, &["window", "show", "meetings"]).map(drop)
 }
 
 pub fn version(hex: &Path) -> Option<String> {

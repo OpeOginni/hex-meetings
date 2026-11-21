@@ -6,7 +6,7 @@
 
 use std::path::PathBuf;
 
-fn home() -> PathBuf {
+pub fn home() -> PathBuf {
     std::env::var_os("HOME").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("."))
 }
 
@@ -25,12 +25,29 @@ pub fn data_dir() -> PathBuf {
         .join("hex-meetings")
 }
 
-pub fn recipes_dir() -> PathBuf {
-    data_dir().join("recipes")
+pub fn reports_dir() -> PathBuf {
+    data_dir().join("reports")
 }
 
 pub fn activity_file() -> PathBuf {
     data_dir().join("activity.jsonl")
+}
+
+pub fn settings_file() -> PathBuf {
+    data_dir().join("settings.json")
+}
+
+/// Where results are saved as Markdown.
+pub fn summaries_dir() -> PathBuf {
+    home().join("Documents/Meeting summaries")
+}
+
+/// A path with the home folder shown as `~`.
+pub fn tilde(path: &std::path::Path) -> String {
+    match path.strip_prefix(home()) {
+        Ok(rest) => format!("~/{}", rest.display()),
+        Err(_) => path.display().to_string(),
+    }
 }
 
 /// The PATH children get: the inherited one, then the usual install folders.
