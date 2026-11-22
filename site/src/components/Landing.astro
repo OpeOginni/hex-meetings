@@ -107,6 +107,7 @@ const hexes = [
           widths={[800, 1240, 1800, 2480]}
           sizes="(max-width: 1200px) 94vw, 1120px"
           class="window"
+          data-window
           loading="eager"
         />
       </div>
@@ -197,6 +198,19 @@ const hexes = [
     </footer>
 
     <script>
+      // The app window lies back at the top of the page and stands up flat once scrolled into view.
+      const appWindow = document.querySelector<HTMLElement>("[data-window]");
+      if (appWindow) {
+        let queued = false;
+        const settle = () => {
+          queued = false;
+          appWindow.toggleAttribute("data-flat", appWindow.getBoundingClientRect().top < innerHeight * 0.6);
+        };
+        addEventListener("scroll", () => (queued ||= (requestAnimationFrame(settle), true)), { passive: true });
+        addEventListener("resize", settle);
+        settle();
+      }
+
       // Hex Meetings runs only on macOS; say so plainly to visitors on anything else.
       const mac = /Mac/i.test(navigator.platform || navigator.userAgent) && !/iPhone|iPad/i.test(navigator.userAgent);
       if (!mac) {
@@ -412,18 +426,11 @@ const hexes = [
     box-shadow: 0 -20px 120px #2f56d02e;
     transform-origin: 50% 100%;
     transform: rotateX(12deg);
+    transition: transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1);
   }
-  @supports (animation-timeline: view()) {
-    .window {
-      animation: settle linear both;
-      animation-timeline: view();
-      animation-range: entry 0% cover 45%;
-    }
-    @keyframes settle {
-      to {
-        transform: none;
-      }
-    }
+  /* Set by the script once the window is scrolled into view; cleared again back at the top. */
+  .window[data-flat] {
+    transform: none;
   }
 
   main {
