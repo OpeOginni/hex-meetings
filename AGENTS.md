@@ -17,13 +17,14 @@ An unofficial Rune desktop app that reads Hex's meetings through its public CLI 
 - `src/ui/`: views. `src/demo.rs`: made-up data for scenes and tests.
 - `scripts/run-macos.sh` runs a dev build as an app bundle. `scripts/package-macos.sh` builds the release app, zip and disk image into `dist/`; `.github/workflows/release.yml` runs it for a `v*` tag matching `Cargo.toml` and publishes the release. `scripts/install.sh` installs the latest release (curl-downloaded, so no quarantine prompt).
 - `site/`: the landing page (static Astro, deployed on Vercel with `site` as the root directory). Its screens and marks in `site/src/assets/` are copies of the app's own captures and logos.
+- `src/update.rs`: Check for updates and Update in About: the latest GitHub release, its zip checked against `SHA256SUMS`, swapped into the running app's bundle, then a relaunch. The asset names must match `scripts/package-macos.sh`.
 - `src/paths.rs`: opened from Finder, the app takes the login shell's PATH (`adopt_login_path`), so agents installed with nvm or Homebrew are found.
 
 ## Rules
 
 - Use rustup's toolchain (`rust-toolchain.toml`); Homebrew's older `cargo` can't build Rune.
 - Nothing blocks the UI thread: Hex calls and agent runs happen on threads that push `Event`s.
-- The app never calls a model. Reports run the user's own agent. The only web requests are posts the person approves, to places they connected (`src/places.rs`: Slack webhook, Notion, GitHub, Linear). Tokens live in the Keychain and never reach an agent.
+- The app never calls a model. Reports run the user's own agent. The only web requests are posts the person approves, to places they connected (`src/places.rs`: Slack webhook, Notion, GitHub, Linear), the read-only Test of a place, and the update check (`src/update.rs`: GitHub's latest release, only when the person presses Check for updates or turned on checking at launch, which is off by default). Tokens live in the Keychain and never reach an agent.
 - Show where a transcript goes before every run the person starts, and preview a result before posting it. Automatic runs (`auto: true`) are opted into per report, in the editor that shows where it goes; they never post by themselves and can't use `sends_to`.
 - Check UI changes headless: `cargo run -- --snap out.png --scene <name>` (see `SCENES` in `src/main.rs`), in both `--theme light` and `--theme dark`.
 - `cargo test` must pass. Demo data stays fictional.

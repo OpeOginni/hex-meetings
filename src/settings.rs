@@ -26,6 +26,8 @@ pub struct Settings {
     /// Places Hex Meetings posts to. Their secrets are in the Keychain.
     #[serde(default)]
     pub connections: Vec<crate::places::Connection>,
+    #[serde(default)]
+    pub check_updates: bool,
 }
 
 impl Settings {

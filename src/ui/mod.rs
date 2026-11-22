@@ -115,6 +115,17 @@ fn sidebar(s: &App, k: &Kit) -> El {
         .child(nav(s, k, Page::Setup, "Setup", &oc::SLIDERS, None))
         .child(nav(s, k, Page::About, "About", &oc::INFO, None))
         .child(spacer())
+        .children(matches!(s.update, crate::app::Update::Available(_)).then(|| {
+            rune_kit::Button::new("Update available")
+                .icon(&oc::DOWNLOAD)
+                .variant(rune_kit::ButtonVariant::Neutral)
+                .control_size(rune_kit::ControlSize::Small)
+                .on_press(|s: &mut App| s.go(crate::app::Page::About))
+                .build(k)
+                .key("update-available")
+                .mx(8.0)
+                .mb(10.0)
+        }))
         .child(
             row()
                 .key("hex-status")

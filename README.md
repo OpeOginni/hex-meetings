@@ -17,7 +17,7 @@ See the [example reports](examples/reports/) for ideas.
 
 You need an **Apple silicon Mac with macOS 15 or later** and **Hex 3.4 or later**. Hex has a Windows build, but its Meetings recording feature is macOS-only, so Hex Meetings is macOS-only too.
 
-Install the latest release into `/Applications` (run it again to update):
+Install the latest release into `/Applications`:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/OpeOginni/hex-meetings/main/scripts/install.sh | sh
@@ -25,13 +25,15 @@ curl -fsSL https://raw.githubusercontent.com/OpeOginni/hex-meetings/main/scripts
 
 Or download `Hex-Meetings-macOS-arm64.dmg` from the [latest release](https://github.com/OpeOginni/hex-meetings/releases/latest) and drag the app into Applications. The app isn't notarized by Apple yet, so the first time you open a downloaded copy, macOS blocks it: open **System Settings › Privacy & Security** and click **Open Anyway**. The install command doesn't need this step.
 
+To update, open **About** and press **Check for updates**, then **Update**. The app downloads the new version, checks it, and reopens.
+
 Follow **Get started** in the app to enable Meetings in Hex and record your first call. To run reports, install one of the supported agent CLIs and select it in **Setup**.
 
 ## Where your data goes
 
 Hex records and transcribes the call. Hex Meetings reads it through [Hex's public CLI](https://github.com/anomalyco/hex/blob/dev/docs/transcript-cli.md) and doesn't open Hex's internal files.
 
-Before a manual run, the app shows where your transcript will go. Your agent's model settings determine how it processes the transcript. Automatic runs are opt-in and never post on their own. For built-in destinations, the app keeps credentials in the macOS Keychain and asks before posting. If you choose **Your agent's tools**, the agent handles delivery through its own connections.
+Before a manual run, the app shows where your transcript will go. Your agent's model settings determine how it processes the transcript. Automatic runs are opt-in and never post on their own. For built-in destinations, the app keeps credentials in the macOS Keychain and asks before posting. If you choose **Your agent's tools**, the agent handles delivery through its own connections. The app asks GitHub for a newer version only when you press **Check for updates** in **About**, or each time it opens if you turn that on there.
 
 ## Development
 

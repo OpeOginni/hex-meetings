@@ -2,11 +2,11 @@
 //! whose app does the recording and transcribing this one builds on.
 
 use rune::{El, col, icon, row, text};
-use rune_kit::{Button, ButtonVariant, ControlSize, Kit};
+use rune_kit::{Button, ButtonVariant, ControlSize, Kit, Spinner, Switch};
 use rune_theme_opencode::icons as oc;
 
 use super::{Tone, header, logos, tag};
-use crate::app::{self, App};
+use crate::app::{self, App, Update};
 
 /// What this app is, and the credit owed to Hex and Anomaly.
 fn card(k: &Kit) -> El {
@@ -154,10 +154,84 @@ fn calls(s: &App, k: &Kit) -> El {
         )
 }
 
+fn updates(s: &App, k: &Kit) -> El {
+    let c = &k.c;
+    let small = |label: &str, key: &str, variant: ButtonVariant, f: fn(&mut App)| {
+        Button::new(label.to_string()).variant(variant).control_size(ControlSize::Small).on_press(f).build(k).key(key.to_string())
+    };
+    let line = |words: String, color| text(words).font(k.ty.small).color(color).wrap().grow(1.0).shrink().min_w(0.0);
+    let current = crate::update::current();
+    let status = match &s.update {
+        Update::Unchecked => row().w_full().gap(12.0).center_y().child(line(format!("You have version {current}."), c.text_muted)).child(small(
+            "Check for updates",
+            "check-updates",
+            ButtonVariant::Neutral,
+            App::check_updates,
+        )),
+        Update::Checking => row().w_full().gap(8.0).center_y().child(Spinner::new().size(14.0).build(k)).child(line("Checking GitHub\u{2026}".into(), c.text_muted)),
+        Update::UpToDate => row()
+            .w_full()
+            .gap(12.0)
+            .center_y()
+            .child(icon(&oc::CHECK_SMALL, 16.0).color(c.success.icon))
+            .child(line(format!("Version {current} is the latest."), c.text_muted))
+            .child(small("Check again", "check-updates", ButtonVariant::Neutral, App::check_updates)),
+        Update::Available(r) => {
+            let page = r.page.clone();
+            row()
+                .w_full()
+                .gap(8.0)
+                .center_y()
+                .child(line(format!("Version {} is out. You have {current}.", r.version), c.text_base))
+                .child(
+                    Button::new("What's new")
+                        .icon(&oc::ARROW_UP_RIGHT)
+                        .variant(ButtonVariant::Neutral)
+                        .control_size(ControlSize::Small)
+                        .help(page.clone())
+                        .on_press(move |_: &mut App| app::reveal(&page))
+                        .build(k)
+                        .key("release-notes"),
+                )
+                .child(small("Update", "install-update", ButtonVariant::Submit, App::install_update))
+        }
+        Update::Installing(r) => row()
+            .w_full()
+            .gap(8.0)
+            .center_y()
+            .child(Spinner::new().size(14.0).build(k))
+            .child(line(format!("Downloading version {}. The app reopens when it's done.", r.version), c.text_muted)),
+        Update::Failed(e) => row()
+            .w_full()
+            .gap(8.0)
+            .center_y()
+            .child(icon(&oc::WARNING, 14.0).color(c.warning.icon))
+            .child(line(e.clone(), c.text_muted))
+            .child(small("Try again", "check-updates", ButtonVariant::Neutral, App::check_updates)),
+    };
+    col()
+        .key("updates")
+        .w_full()
+        .gap(12.0)
+        .padding(18.0)
+        .radius(k.radius.lg)
+        .fill(c.surface_raised_base)
+        .border(1.0, c.border_weak)
+        .child(text("Updates").font(super::HEADING).color(c.text_strong))
+        .child(status)
+        .child(
+            Switch::new(s.settings.check_updates)
+                .label("Check when the app opens")
+                .on_toggle(|s: &mut App| s.set_check_updates(!s.settings.check_updates))
+                .build(k)
+                .key("auto-check-updates"),
+        )
+}
+
 pub fn page(s: &App, k: &Kit) -> El {
     super::page_shell(
         "about",
         header(k, "About", "Hex Meetings, the app it's built on, and the calls it records.", vec![]),
-        col().w_full().gap(20.0).child(card(k)).child(calls(s, k)),
+        col().w_full().gap(20.0).child(card(k)).child(updates(s, k)).child(calls(s, k)),
     )
 }

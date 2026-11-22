@@ -18,6 +18,7 @@ mod runner;
 mod settings;
 mod speech;
 mod time;
+mod update;
 mod ui;
 
 use app::{App, HexStatus, Page};
@@ -82,6 +83,23 @@ const SCENES: &[Scene] = &[
         s.model_edit = rune::TextEdit::new("my-provider/custom-model");
     }),
     ("about", |s| s.page = Page::About),
+    ("update-available", |s| {
+        s.page = Page::About;
+        s.update = app::Update::Available(update::Release {
+            version: "1.0.0".into(),
+            page: "https://github.com/OpeOginni/hex-meetings/releases/tag/v1.0.0".into(),
+            zip: None,
+            sums: None,
+        });
+    }),
+    ("update-latest", |s| {
+        s.page = Page::About;
+        s.update = app::Update::UpToDate;
+    }),
+    ("update-failed", |s| {
+        s.page = Page::About;
+        s.update = app::Update::Failed("Couldn't reach GitHub. Check your connection.".into());
+    }),
     ("activity-empty", |s| {
         s.page = Page::Activity;
         s.activity.clear();

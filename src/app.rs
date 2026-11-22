@@ -44,6 +44,8 @@ pub enum HexStatus {
 
 pub enum Event {
     Hex(HexStatus),
+    Latest(Result<crate::update::Release, String>),
+    Updated(Result<PathBuf, String>),
     Meetings(Result<Vec<Meeting>, String>),
     Detail(String, Result<Detail, String>),
     RunEnded(Run),
@@ -63,6 +65,17 @@ pub enum Event {
     MeetingsOn(Option<bool>),
     Notice(String),
     Tick,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub enum Update {
+    #[default]
+    Unchecked,
+    Checking,
+    UpToDate,
+    Available(crate::update::Release),
+    Installing(crate::update::Release),
+    Failed(String),
 }
 
 pub struct Running {
@@ -148,6 +161,7 @@ pub struct App {
     pub checking: Option<Place>,
     /// Clear was pressed once; the next press clears Activity.
     pub confirm_clear: bool,
+    pub update: Update,
     /// The report being written or edited on the Reports page.
     pub editing: Option<Draft>,
     /// The meeting whose deletion was handed to Hex's window.
@@ -258,6 +272,9 @@ impl App {
             return;
         }
         self.hex = Some(HexStatus::Looking);
+        if self.settings.check_updates {
+            self.check_updates();
+        }
         let lang = self.send();
         std::thread::spawn(move || lang(Event::MacLanguage(crate::speech::mac_language())));
         let send = self.send();
@@ -382,6 +399,16 @@ impl App {
                     (Ok(_), None) => {}
                 }
             }
+            Event::Latest(Ok(release)) => {
+                self.update = if crate::update::is_newer(&release.version, crate::update::current()) {
+                    Update::Available(release)
+                } else {
+                    Update::UpToDate
+                };
+            }
+            Event::Latest(Err(e)) => self.update = Update::Failed(e),
+            Event::Updated(Ok(bundle)) => crate::update::relaunch(&bundle),
+            Event::Updated(Err(e)) => self.update = Update::Failed(e),
             Event::Checked(place, result) => {
                 self.checks.insert(place, result);
                 self.checking = None;
@@ -455,6 +482,28 @@ impl App {
         self.go(Page::Meetings);
         self.select(Some(meeting));
         self.armed = Some(id);
+    }
+
+    pub fn check_updates(&mut self) {
+        if self.offline || matches!(self.update, Update::Checking | Update::Installing(_)) {
+            return;
+        }
+        self.update = Update::Checking;
+        let send = self.send();
+        std::thread::spawn(move || send(Event::Latest(crate::update::latest())));
+    }
+
+    pub fn install_update(&mut self) {
+        let Update::Available(release) = &self.update else { return };
+        let release = release.clone();
+        self.update = Update::Installing(release.clone());
+        let send = self.send();
+        std::thread::spawn(move || send(Event::Updated(crate::update::install(&release))));
+    }
+
+    pub fn set_check_updates(&mut self, on: bool) {
+        self.settings.check_updates = on;
+        self.save_settings();
     }
 
     /// A report by its name, as a run records it.
