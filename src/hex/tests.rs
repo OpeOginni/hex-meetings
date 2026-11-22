@@ -109,3 +109,28 @@ fn reads_hex_meeting_settings_and_models() {
     assert!(matches!(crate::speech::fit(&o.models, "en"), crate::speech::Fit::Fits(m) if m.id == "parakeet_unified_en"));
     assert!(retention_sentence(None).contains("24 hours"));
 }
+
+/// Reads this Mac's Hex for real, read-only: the meeting list, the newest
+/// finished call, and the meeting settings (those only while Hex is open).
+/// Prints counts, never the transcript. `cargo test -- --ignored real_hex`.
+#[test]
+#[ignore]
+fn real_hex_reads_meetings_and_settings() {
+    let hex = find_binary().expect("Hex is installed");
+    println!("hex {}", version(&hex).unwrap_or_default());
+    let meetings = list(&hex).unwrap();
+    println!("{} meetings", meetings.len());
+    for m in &meetings {
+        println!("  {} {:?} {} min, {}{}", m.status, m.application, m.duration_ms / 60_000, m.transcript_source, if m.in_progress { ", in progress" } else { "" });
+    }
+    let done = meetings.iter().find(|m| m.status == "complete" && !m.in_progress).expect("a finished call");
+    let d = show(&hex, &done.id).unwrap();
+    let mine = d.entries.iter().filter(|e| e.speaker() == "You").count();
+    println!("newest finished call: {} entries ({mine} You), Hex notes: {}", d.entries.len(), d.notes.is_some());
+    assert!(!d.entries.is_empty());
+    assert!(!transcript_text(&d.entries).is_empty());
+    match overview(&hex) {
+        Ok(o) => println!("settings: retention {:?}, more call apps {:?}, {} speech models", o.retention(), o.more_call_apps(), o.models.len()),
+        Err(e) => println!("settings: {e}"),
+    }
+}

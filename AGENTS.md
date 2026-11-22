@@ -27,3 +27,4 @@ An unofficial Rune desktop app that reads Hex's meetings through its public CLI 
 - Show where a transcript goes before every run the person starts, and preview a result before posting it. Automatic runs (`auto: true`) are opted into per report, in the editor that shows where it goes; they never post by themselves and can't use `sends_to`.
 - Check UI changes headless: `cargo run -- --snap out.png --scene <name>` (see `SCENES` in `src/main.rs`), in both `--theme light` and `--theme dark`.
 - `cargo test` must pass. Demo data stays fictional.
+- Before a release, run the real-machine checks too: `cargo test -- --ignored` reads this Mac's Hex (counts only), the Keychain and the login PATH, and runs each report format through an agent on made-up calls. Pick the agent with `HEX_MEETINGS_AGENT` (`opencode`, `claude`, `cursor`, `pi`) and the model with `HEX_MEETINGS_MODEL`; leave the model unset rather than empty.

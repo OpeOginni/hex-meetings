@@ -113,7 +113,7 @@ impl Report {
         let format = match (self.to, &self.sends_to) {
             (Some(to), _) => to.instructions(),
             (None, Some(_)) => "",
-            (None, None) => "Reply in Markdown, with no preamble.",
+            (None, None) => "Reply in Markdown, with no preamble. Write action items as to-dos: `- [ ] Owner: task`.",
         };
         if self.focus.contains("{{transcript}}") {
             let prompt = vars.fill(&self.focus);
@@ -293,8 +293,8 @@ pub fn builtin() -> &'static Report {
         sends_to: None,
         to: None,
         auto: false,
-        focus: "A summary in 3 to 5 sentences, then the decisions that were made, then the action items as \
-                `- [ ] Owner: task` (You, Them, or a name if one is said), then any open questions."
+        focus: "A summary in 3 to 5 sentences, then the decisions that were made, then the action items, each with its owner \
+                (You, Them, or a name if one is said), then any open questions."
             .into(),
         path: PathBuf::new(),
     });

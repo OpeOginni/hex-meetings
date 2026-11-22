@@ -121,6 +121,26 @@ fn summary_report_runs_through_an_agent() {
     println!("{}", ended.output);
     assert_eq!(ended.outcome, crate::activity::Outcome::Done, "{}", ended.output);
     assert!(ended.output.to_lowercase().contains("northwind"));
+    assert!(ended.output.contains("- [ ]"), "action items shown on the call are to-dos");
+}
+
+/// The Summary sent to Slack for real, on the made-up sales call: the reply
+/// must use Slack's formatting, not Markdown. `cargo test -- --ignored slack_summary`.
+#[test]
+#[ignore]
+fn slack_summary_reply_uses_slack_formatting() {
+    let mut report = builtin().clone();
+    report.to = Some(crate::places::To::Place(crate::places::Place::Slack));
+    let transcript = crate::hex::transcript_text(&crate::demo::sales_detail().entries);
+    let agent = std::env::var("HEX_MEETINGS_AGENT").unwrap_or_else(|_| "opencode".into());
+    let plan = report.plan(crate::agents::by_id(&agent), |_| std::env::var("HEX_MEETINGS_MODEL").ok()).unwrap();
+    let argv = report.argv(&plan.command, &Vars { transcript: &transcript, ..vars("") });
+    let ended = crate::runner::run(&argv, &std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)));
+    println!("{}", ended.output);
+    assert_eq!(ended.outcome, crate::activity::Outcome::Done, "{}", ended.output);
+    assert!(!ended.output.contains("**"), "Slack bold is *one* asterisk");
+    assert!(!ended.output.lines().any(|l| l.trim_start().starts_with('#')), "Slack has no # headings");
+    assert!(!ended.output.contains("- [ ]"), "Slack shows Markdown to-dos as text");
 }
 
 #[test]

@@ -94,6 +94,15 @@ pub fn run(argv: &[String], stop: &Arc<AtomicBool>) -> Ended {
             let code = status.and_then(|s| s.code()).map(|c| format!(" (exit {c})")).unwrap_or_default();
             let stderr = strip_ansi(stderr.trim());
             let detail = [output.as_str(), stderr.as_str()].iter().filter(|s| !s.is_empty()).copied().collect::<Vec<_>>().join("\n\n");
+            // A CLI that isn't signed in often prints its login screen, which
+            // reads as noise here; say what to do instead.
+            let lower = detail.to_lowercase();
+            if ["sign in", "log in", "logged in", "login required", "not authenticated"].iter().any(|p| lower.contains(p)) {
+                return Ended {
+                    outcome: Outcome::Failed,
+                    output: format!("{program} isn't signed in. Open Terminal, run `{program}` and sign in, then try again."),
+                };
+            }
             Ended { outcome: Outcome::Failed, output: format!("{program} failed{code}.\n\n{detail}").trim().to_string() }
         }
     }
@@ -140,6 +149,14 @@ mod tests {
         let ended = run(&argv(&["sh", "-c", "echo nope >&2; exit 3"]), &stop);
         assert_eq!(ended.outcome, Outcome::Failed);
         assert!(ended.output.contains("exit 3") && ended.output.contains("nope"), "{}", ended.output);
+    }
+
+    #[test]
+    fn an_agent_that_isnt_signed_in_says_so() {
+        let stop = Arc::new(AtomicBool::new(false));
+        let ended = run(&argv(&["sh", "-c", "echo '  )){##  Press any key to sign in...'; exit 1"]), &stop);
+        assert_eq!(ended.outcome, Outcome::Failed);
+        assert_eq!(ended.output, "sh isn't signed in. Open Terminal, run `sh` and sign in, then try again.");
     }
 
     #[test]
