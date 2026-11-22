@@ -1,6 +1,4 @@
 ---
-// The landing page. `animated` swaps the icon at the top of the hero for the animated story
-// (/animation), so the two versions can be compared; everything else is shared.
 import "@fontsource-variable/inter";
 import Show from "./Show.astro";
 import "@fontsource/ibm-plex-mono/400.css";
@@ -21,7 +19,6 @@ import notion from "../assets/marks/notion.svg";
 import github from "../assets/marks/github.svg";
 import linear from "../assets/marks/linear.svg";
 
-const { animated = false } = Astro.props as { animated?: boolean };
 const DOWNLOAD =
   "https://github.com/OpeOginni/hex-meetings/releases/latest/download/Hex-Meetings-macOS-arm64.dmg";
 const REPO = "https://github.com/OpeOginni/hex-meetings";
@@ -59,7 +56,6 @@ const hexes = [
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Hex Meetings for macOS</title>
     <meta name="description" content={DESCRIPTION} />
-    {animated && <meta name="robots" content="noindex" />}
     <meta name="theme-color" content="#121212" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="canonical" href={Astro.site} />
@@ -82,7 +78,7 @@ const hexes = [
       </div>
     </nav>
 
-    <header class:list={["hero", { "hero--animated": animated }]}>
+    <header class="hero">
       <svg class="hexes" viewBox="0 0 1820 1220" aria-hidden="true">
         {
           hexes.map((h, n) => (
@@ -97,7 +93,7 @@ const hexes = [
         }
       </svg>
 
-      {animated && <Show />}
+      <Show />
       <Image src={icon} alt="" width={112} height={112} class="icon" loading="eager" />
       <h1>Hex Meetings</h1>
       <p class="lede">{DESCRIPTION}</p>
@@ -314,27 +310,12 @@ const hexes = [
     flex-direction: column;
     align-items: center;
     text-align: center;
-    padding: 152px 16px 0;
+    padding: 120px 16px 0;
     overflow: hidden;
     background: radial-gradient(ellipse 70% 52% at 50% 30%, #2f56d042 0%, var(--bg) 100%);
   }
-  /* The story brings its own outlines and icon; the static ones stay for phones, where it's hidden. */
-  .hero.hero--animated {
-    padding-top: 120px;
-  }
-  .hero--animated .icon {
-    display: none;
-  }
-  .hero--animated .hexes {
-    transition: opacity 0.6s;
-  }
   .hero[data-playing] .hexes {
     opacity: 0.25;
-  }
-  @media (max-width: 720px) {
-    .hero--animated .icon {
-      display: block;
-    }
   }
   .hexes {
     position: absolute;
@@ -344,6 +325,7 @@ const hexes = [
     translate: -50% 0;
     pointer-events: none;
     mask-image: radial-gradient(ellipse 60% 55% at 50% 40%, #000 0%, transparent 100%);
+    transition: opacity 0.6s;
   }
   .hex {
     fill: none;
@@ -371,8 +353,14 @@ const hexes = [
     position: relative;
   }
   .icon {
+    display: none;
     width: 112px;
     filter: drop-shadow(0 18px 40px #2f56d066);
+  }
+  @media (max-width: 720px) {
+    .icon {
+      display: block;
+    }
   }
   h1 {
     margin: 28px 0 0;
@@ -575,9 +563,6 @@ const hexes = [
   }
 
   @media (max-width: 860px) {
-    .hero {
-      padding-top: 120px;
-    }
     .links a {
       padding: 8px;
     }

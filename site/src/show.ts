@@ -1,4 +1,4 @@
-// The story on /animation: a Hex user doing the meeting work by hand, then Hex Meetings doing it.
+// A Hex user does the meeting work by hand, then Hex Meetings does it.
 // One timeline: every frame is a pure function of the time `t`, so the show can be played, replayed
 // or opened at any moment (?t=12). The sound is synthesized live.
 
