@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><defs>
+ <linearGradient id="tileg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#34343a"/><stop offset=".5" stop-color="#18181b"/><stop offset="1" stop-color="#0b0b0d"/></linearGradient>
+ <radialGradient id="glow" cx=".5" cy=".18" r=".75"><stop offset="0" stop-color="#fff" stop-opacity=".10"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+ <linearGradient id="porc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".55" stop-color="#e9e9ed"/><stop offset="1" stop-color="#b9b9c0"/></linearGradient>
+ <linearGradient id="engr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0c0c0e"/><stop offset="1" stop-color="#3a3a40"/></linearGradient>
+ <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8fb0ff" stop-opacity=".55"/><stop offset="1" stop-color="#3d63d9" stop-opacity=".35"/></linearGradient>
+ <linearGradient id="seal" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6f95ff"/><stop offset="1" stop-color="#2f56d0"/></linearGradient>
+ <filter id="lift" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#000" flood-opacity=".6"/></filter>
+ <filter id="soft" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#000" flood-opacity=".45"/></filter>
+ <filter id="tileshadow" x="-20%" y="-20%" width="140%" height="145%"><feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#000" flood-opacity=".45"/></filter>
+<linearGradient id="glass2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9db8ff" stop-opacity=".75"/><stop offset="1" stop-color="#2f56d0" stop-opacity=".55"/></linearGradient>
+<linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".45"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/></linearGradient>
+</defs><rect x="100" y="100" width="824" height="824" rx="186" fill="url(#tileg)"/>
+<rect x="100" y="100" width="824" height="824" rx="186" fill="url(#glow)"/>
+<rect x="101.5" y="101.5" width="821" height="821" rx="185" fill="none" stroke="#fff" stroke-opacity=".09" stroke-width="3"/><g filter="url(#soft)"><polygon points="745.0,440.0 662.5,582.9 497.5,582.9 415.0,440.0 497.5,297.1 662.5,297.1" fill="url(#glass2)" stroke="url(#glass2)" stroke-width="64" stroke-linejoin="round"/></g>
+<polygon points="745.0,440.0 662.5,582.9 497.5,582.9 415.0,440.0 497.5,297.1 662.5,297.1" fill="url(#sheen)" stroke="url(#sheen)" stroke-width="64" stroke-linejoin="round"/>
+<g filter="url(#lift)"><polygon points="615.0,582.0 532.5,724.9 367.5,724.9 285.0,582.0 367.5,439.1 532.5,439.1" fill="url(#porc)" stroke="url(#porc)" stroke-width="64" stroke-linejoin="round"/></g><rect x="347" y="540" width="38" height="84" rx="19" fill="url(#engr)"/><rect x="403" y="490" width="38" height="184" rx="19" fill="url(#engr)"/><rect x="459" y="512" width="38" height="140" rx="19" fill="url(#engr)"/><rect x="515" y="548" width="38" height="68" rx="19" fill="url(#engr)"/></svg>

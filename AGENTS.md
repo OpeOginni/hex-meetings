@@ -16,6 +16,7 @@ An unofficial Rune desktop app that reads Hex's meetings through its public CLI 
 - `assets/icon.svg`: the app icon (master); `assets/icon.png` is its 1024 px render with a transparent background, used for the Dock and the README. Render it with headless Chrome (`--default-background-color=00000000`): Quick Look adds a white background, and AppKit drops the shadows. The in-app copy is `logos::APP`.
 - `src/ui/`: views. `src/demo.rs`: made-up data for scenes and tests.
 - `scripts/run-macos.sh` runs a dev build as an app bundle. `scripts/package-macos.sh` builds the release app, zip and disk image into `dist/`; `.github/workflows/release.yml` runs it for a `v*` tag matching `Cargo.toml` and publishes the release. `scripts/install.sh` installs the latest release (curl-downloaded, so no quarantine prompt).
+- `site/`: the landing page (static Astro, deployed on Vercel with `site` as the root directory). Its screens and marks in `site/src/assets/` are copies of the app's own captures and logos.
 - `src/paths.rs`: opened from Finder, the app takes the login shell's PATH (`adopt_login_path`), so agents installed with nvm or Homebrew are found.
 
 ## Rules

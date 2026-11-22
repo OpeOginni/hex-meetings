@@ -1,0 +1,612 @@
+---
+// The landing page. `animated` swaps the icon at the top of the hero for the animated story
+// (/animation), so the two versions can be compared; everything else is shared.
+import "@fontsource-variable/inter";
+import Show from "./Show.astro";
+import "@fontsource/ibm-plex-mono/400.css";
+import { Image } from "astro:assets";
+import icon from "../assets/icon.svg";
+import windowShot from "../assets/window.png";
+import callShot from "../assets/call.png";
+import panelShot from "../assets/panel.png";
+import editorShot from "../assets/editor.png";
+import previewShot from "../assets/preview.png";
+import claude from "../assets/marks/claude.svg";
+import codex from "../assets/marks/codex.svg";
+import cursor from "../assets/marks/cursor.svg";
+import opencode from "../assets/marks/opencode.svg";
+import pi from "../assets/marks/pi.svg";
+import slack from "../assets/marks/slack.svg";
+import notion from "../assets/marks/notion.svg";
+import github from "../assets/marks/github.svg";
+import linear from "../assets/marks/linear.svg";
+
+const { animated = false } = Astro.props as { animated?: boolean };
+const DOWNLOAD =
+  "https://github.com/OpeOginni/hex-meetings/releases/latest/download/Hex-Meetings-macOS-arm64.dmg";
+const REPO = "https://github.com/OpeOginni/hex-meetings";
+const HEX = "https://anoma.ly/hex/";
+const INSTALL =
+  "curl -fsSL https://raw.githubusercontent.com/OpeOginni/hex-meetings/main/scripts/install.sh | sh";
+const DESCRIPTION =
+  "Turn recorded calls into summaries, action items, and follow-ups with the AI agent you already use.";
+
+const agents = [
+  { name: "OpenCode", mark: opencode },
+  { name: "Claude Code", mark: claude },
+  { name: "Codex", mark: codex },
+  { name: "Cursor Agent", mark: cursor },
+  { name: "Pi", mark: pi },
+];
+const places = [
+  { name: "Slack", mark: slack },
+  { name: "Notion", mark: notion },
+  { name: "GitHub", mark: github },
+  { name: "Linear", mark: linear },
+];
+// The same hexagon three times, each drawn from a different corner and in its own direction.
+const hexes = [
+  { d: "M 590 55 H 1230 L 1550 610 L 1230 1165 H 590 L 270 610 Z", reverse: true, seconds: 1.9 },
+  { d: "M 270 610 L 590 55 H 1230 L 1550 610 L 1230 1165 H 590 Z", reverse: false, seconds: 1.6 },
+  { d: "M 1550 610 L 1230 1165 H 590 L 270 610 L 590 55 H 1230 Z", reverse: false, seconds: 2.2 },
+];
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hex Meetings for macOS</title>
+    <meta name="description" content={DESCRIPTION} />
+    {animated && <meta name="robots" content="noindex" />}
+    <meta name="theme-color" content="#121212" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="canonical" href={Astro.site} />
+    <meta property="og:title" content="Hex Meetings" />
+    <meta property="og:description" content={DESCRIPTION} />
+    <meta property="og:url" content={Astro.site} />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content={new URL("/og.png", Astro.site)} />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body>
+    <nav class="bar">
+      <div class="links">
+        <a href={HEX}>Get Hex</a>
+        <a href={REPO}>
+          <Image src={github} alt="" width={20} height={20} loading="eager" />
+          GitHub
+        </a>
+        <a class="nav-download" href={DOWNLOAD}>Download</a>
+      </div>
+    </nav>
+
+    <header class:list={["hero", { "hero--animated": animated }]}>
+      <svg class="hexes" viewBox="0 0 1820 1220" aria-hidden="true">
+        {
+          hexes.map((h, n) => (
+            <path
+              d={h.d}
+              transform={`translate(${(n - 1) * 85} 0)`}
+              class:list={["hex", { "hex-main": n === 1, "hex-reverse": h.reverse }]}
+              style={`--delay: ${n * 0.08}s; --seconds: ${h.seconds}s`}
+              pathLength="1"
+            />
+          ))
+        }
+      </svg>
+
+      {animated && <Show />}
+      <Image src={icon} alt="" width={112} height={112} class="icon" loading="eager" />
+      <h1>Hex Meetings</h1>
+      <p class="lede">{DESCRIPTION}</p>
+      <a class="download" href={DOWNLOAD}>Download for macOS</a>
+      <p class="needs" data-needs>macOS only. Apple silicon, macOS 15 or later, and Hex 3.4 or later.</p>
+
+      <div class="stage">
+        <Image
+          src={windowShot}
+          alt="Hex Meetings showing a call's summary and its three action items"
+          widths={[800, 1240, 1800, 2480]}
+          sizes="(max-width: 1200px) 94vw, 1120px"
+          class="window"
+          loading="eager"
+        />
+      </div>
+    </header>
+
+    <main>
+      <section class="step">
+        <div class="copy">
+          <h2>Recorded in Hex.</h2>
+          <p>
+            Open any call Hex has recorded. Hex Meetings reads its transcript and Hex's notes through
+            Hex's public CLI.
+          </p>
+        </div>
+        <Image src={callShot} alt="A recorded call, its notes and transcript" widths={[700, 1240, 2000]} sizes="(max-width: 860px) 94vw, 640px" class="shot" />
+      </section>
+
+      <section class="step">
+        <div class="copy">
+          <h2>Use the agent you already use.</h2>
+          <p>Pick one for each report. Before it runs, the app shows where your transcript goes.</p>
+          <ul class="marks">
+            {
+              agents.map((a) => (
+                <li>
+                  <Image src={a.mark} alt="" width={28} height={28} />
+                  {a.name}
+                </li>
+              ))
+            }
+          </ul>
+        </div>
+        <Image src={panelShot} alt="The Summary panel with its agent and Summarize button" widths={[700, 1240, 1400]} sizes="(max-width: 860px) 94vw, 640px" class="shot" />
+      </section>
+
+      <section class="step">
+        <div class="copy">
+          <h2>Summaries, action items, or your own report.</h2>
+          <p>
+            Start with Summary, or write your own instructions for sales follow-ups, customer feedback or
+            bug reports, and choose where the result goes.
+          </p>
+        </div>
+        <Image src={editorShot} alt="The report editor with its name, focus and destination menu" widths={[700, 1240, 1500]} sizes="(max-width: 860px) 94vw, 640px" class="shot" />
+      </section>
+
+      <section class="step">
+        <div class="copy">
+          <h2>Preview before you post.</h2>
+          <p>Copy the result, save it as Markdown, or read the post before it goes out.</p>
+          <ul class="marks">
+            {
+              places.map((p) => (
+                <li>
+                  <Image src={p.mark} alt="" width={28} height={28} />
+                  {p.name}
+                </li>
+              ))
+            }
+          </ul>
+        </div>
+        <Image src={previewShot} alt="A Slack post preview with Post and Don't post buttons" widths={[700, 1240, 1400]} sizes="(max-width: 860px) 94vw, 640px" class="shot" />
+      </section>
+
+      <section class="get" id="download">
+        <Image src={icon} alt="" width={72} height={72} />
+        <h2>Get Hex Meetings</h2>
+        <a class="download" href={DOWNLOAD}>Download for macOS</a>
+        <p class="needs" data-needs>macOS only. Apple silicon, macOS 15 or later, and Hex 3.4 or later.</p>
+
+        <div class="terminal">
+          <p>Or install it from Terminal:</p>
+          <div class="command">
+            <code>{INSTALL}</code>
+            <button type="button" data-copy={INSTALL}>Copy</button>
+          </div>
+        </div>
+        <p class="note">
+          The app isn't notarized by Apple yet. The first time you open the download, go to System
+          Settings, Privacy &amp; Security, and click Open Anyway. The Terminal install skips this.
+        </p>
+      </section>
+    </main>
+
+    <footer>
+      <p>An unofficial companion for Hex. Not affiliated with Hex or Anomaly.</p>
+      <a href={REPO}>Source on GitHub</a>
+    </footer>
+
+    <script>
+      // Hex Meetings runs only on macOS; say so plainly to visitors on anything else.
+      const mac = /Mac/i.test(navigator.platform || navigator.userAgent) && !/iPhone|iPad/i.test(navigator.userAgent);
+      if (!mac) {
+        for (const el of document.querySelectorAll("[data-needs]")) {
+          el.textContent = "Hex Meetings runs on macOS only. Open this page on your Mac to install it.";
+        }
+      }
+      for (const button of document.querySelectorAll<HTMLButtonElement>("[data-copy]")) {
+        button.addEventListener("click", async () => {
+          await navigator.clipboard.writeText(button.dataset.copy!);
+          button.textContent = "Copied";
+          setTimeout(() => (button.textContent = "Copy"), 1600);
+        });
+      }
+    </script>
+  </body>
+</html>
+
+<style is:global>
+  :root {
+    --bg: #121212;
+    --surface: #1c1c1c;
+    --fg: #ededed;
+    --muted: #a3a3a8;
+    --accent: #8fb0ff;
+    --seal: #2f56d0;
+    --line: #ffffff1c;
+    color-scheme: dark;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  html {
+    background: var(--bg);
+  }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 400 1.0625rem/1.6 "Inter Variable", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+  }
+  a {
+    color: inherit;
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+</style>
+
+<style>
+  .bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    height: 72px;
+    padding: 0 max(16px, calc((100vw - 1120px) / 2));
+  }
+  .links a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .links {
+    display: flex;
+    gap: 6px;
+  }
+  .links a {
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.9375rem;
+    font-weight: 560;
+    color: #cfcfd4;
+  }
+  .links a:hover {
+    background: #ffffff10;
+    color: var(--fg);
+  }
+  .links .nav-download {
+    margin-left: 6px;
+    padding: 8px 16px;
+    border-radius: 999px;
+    background: var(--seal);
+    color: var(--fg);
+    font-weight: 600;
+  }
+  .links .nav-download:hover {
+    background: #2549b6;
+  }
+  .links img {
+    width: 20px;
+  }
+
+  .hero {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 152px 16px 0;
+    overflow: hidden;
+    background: radial-gradient(ellipse 70% 52% at 50% 30%, #2f56d042 0%, var(--bg) 100%);
+  }
+  /* The story brings its own outlines and icon; the static ones stay for phones, where it's hidden. */
+  .hero.hero--animated {
+    padding-top: 120px;
+  }
+  .hero--animated .icon {
+    display: none;
+  }
+  .hero--animated .hexes {
+    transition: opacity 0.6s;
+  }
+  .hero[data-playing] .hexes {
+    opacity: 0.25;
+  }
+  @media (max-width: 720px) {
+    .hero--animated .icon {
+      display: block;
+    }
+  }
+  .hexes {
+    position: absolute;
+    top: -40px;
+    left: 50%;
+    width: max(1180px, 100vw);
+    translate: -50% 0;
+    pointer-events: none;
+    mask-image: radial-gradient(ellipse 60% 55% at 50% 40%, #000 0%, transparent 100%);
+  }
+  .hex {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1.5;
+    opacity: 0.32;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: draw var(--seconds) cubic-bezier(0.16, 1, 0.3, 1) var(--delay) forwards;
+  }
+  .hex-reverse {
+    stroke-dashoffset: -1;
+  }
+  .hex-main {
+    stroke-width: 3;
+    opacity: 0.7;
+  }
+  @keyframes draw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  .hero > :not(.hexes) {
+    position: relative;
+  }
+  .icon {
+    width: 112px;
+    filter: drop-shadow(0 18px 40px #2f56d066);
+  }
+  h1 {
+    margin: 28px 0 0;
+    font-size: clamp(3rem, 8vw, 5.5rem);
+    line-height: 1;
+    font-weight: 640;
+    letter-spacing: -0.035em;
+  }
+  .lede {
+    max-width: 30ch;
+    margin: 22px 0 0;
+    font-size: clamp(1.2rem, 2.4vw, 1.45rem);
+    line-height: 1.4;
+    color: #cfcfd4;
+  }
+  .download {
+    display: inline-block;
+    margin-top: 36px;
+    padding: 16px 34px;
+    border-radius: 999px;
+    background: var(--seal);
+    box-shadow:
+      0 12px 36px #2f56d066,
+      inset 0 1px 0 #ffffff33;
+    font-weight: 620;
+    font-size: 1.125rem;
+    text-decoration: none;
+    transition: background 0.15s;
+  }
+  .download:hover {
+    background: #2549b6;
+  }
+  .needs {
+    max-width: 34ch;
+    margin: 14px 0 0;
+    font-size: 0.9375rem;
+    color: var(--muted);
+  }
+
+  .stage {
+    width: min(1120px, 100%);
+    margin-top: 72px;
+    perspective: 2400px;
+  }
+  .window {
+    width: 100%;
+    border-radius: 14px 14px 0 0;
+    outline: 1px solid var(--line);
+    box-shadow: 0 -20px 120px #2f56d02e;
+    transform-origin: 50% 100%;
+    transform: rotateX(12deg);
+  }
+  @supports (animation-timeline: view()) {
+    .window {
+      animation: settle linear both;
+      animation-timeline: view();
+      animation-range: entry 0% cover 45%;
+    }
+    @keyframes settle {
+      to {
+        transform: none;
+      }
+    }
+  }
+
+  main {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 0 16px;
+  }
+  .step {
+    display: grid;
+    grid-template-columns: 5fr 7fr;
+    gap: 64px;
+    align-items: center;
+    padding: 120px 0 0;
+  }
+  .step:nth-child(even) {
+    grid-template-columns: 7fr 5fr;
+  }
+  .step:nth-child(even) .copy {
+    order: 2;
+  }
+  h2 {
+    margin: 0;
+    font-size: clamp(1.9rem, 3.4vw, 2.6rem);
+    line-height: 1.12;
+    font-weight: 620;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+  }
+  .copy p {
+    max-width: 38ch;
+    margin: 18px 0 0;
+    color: var(--muted);
+  }
+  .shot {
+    width: 100%;
+    border-radius: 14px;
+    outline: 1px solid var(--line);
+    box-shadow: 0 30px 80px #000a;
+  }
+  .marks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 22px;
+    margin: 26px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .marks li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 560;
+  }
+  .marks img {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+  }
+
+  .get {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    margin-top: 160px;
+    padding: 80px 0 0;
+  }
+  .get > img {
+    width: 72px;
+    margin-bottom: 24px;
+  }
+  .terminal {
+    width: min(720px, 100%);
+    margin-top: 56px;
+    text-align: left;
+  }
+  .terminal p {
+    margin: 0 0 10px;
+    color: var(--muted);
+  }
+  .command {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 12px 12px 18px;
+    border-radius: 12px;
+    background: var(--surface);
+  }
+  .command code {
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    white-space: nowrap;
+    font: 0.875rem/1.5 "IBM Plex Mono", ui-monospace, monospace;
+    color: #d6d6db;
+    scrollbar-width: none;
+  }
+  .command button {
+    flex: none;
+    padding: 8px 16px;
+    border: 0;
+    border-radius: 8px;
+    background: #2a2a2e;
+    color: var(--fg);
+    font: inherit;
+    font-size: 0.9375rem;
+    font-weight: 560;
+    cursor: pointer;
+  }
+  .command button:hover {
+    background: #232326;
+  }
+  .note {
+    width: min(720px, 100%);
+    margin: 18px 0 0;
+    text-align: left;
+    font-size: 0.9375rem;
+    color: var(--muted);
+  }
+
+  footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 12px 24px;
+    max-width: 1120px;
+    margin: 140px auto 0;
+    padding: 32px 16px 48px;
+    font-size: 0.9375rem;
+    color: var(--muted);
+  }
+  footer p {
+    margin: 0;
+  }
+  footer a:hover {
+    color: var(--fg);
+  }
+
+  @media (max-width: 860px) {
+    .hero {
+      padding-top: 120px;
+    }
+    .links a {
+      padding: 8px;
+    }
+    .stage {
+      margin-top: 48px;
+    }
+    .step {
+      grid-template-columns: 1fr;
+      gap: 28px;
+      padding-top: 88px;
+    }
+    .step:nth-child(even) {
+      grid-template-columns: 1fr;
+    }
+    .step:nth-child(even) .copy {
+      order: 0;
+    }
+    .get {
+      margin-top: 112px;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hex {
+      animation: none;
+      stroke-dashoffset: 0;
+    }
+    .window {
+      animation: none !important;
+      transform: none;
+    }
+  }
+</style>
