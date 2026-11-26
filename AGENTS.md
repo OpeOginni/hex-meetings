@@ -4,7 +4,7 @@ An unofficial Rune desktop app that reads Hex's meetings through its public CLI 
 
 ## Layout
 
-- `src/hex.rs`: the only code that talks to Hex: `hex meetings list|show --json` (JSON version 1), `hex settings get meetings`, `hex model list`, `hex settings set meetings.retention`, `hex labs on meetings`, `hex meetings delete` (Hex 3.5+, after the person confirms), and `hex window show meetings|models`. Never switch Hex's speech model: dictation uses it too. Don't read Hex's internal folders.
+- `src/hex.rs`: the only code that talks to Hex: `hex meetings list|show --json` (JSON version 1), `hex settings get meetings`, `hex model list`, `hex settings set meetings.retention|meetings.audio_retention`, `hex labs on meetings`, `hex meetings delete` (after the person confirms), and `hex window show meetings|models`. Never switch Hex's speech model: dictation uses it too. Don't read Hex's internal folders.
 - `src/reports.rs`: the report format, the prompt the app builds around a report's focus (`Report::prompt`), and the built-in Summary (`reports::builtin`). Summary isn't a saved report: the call's page sets its agent, where it goes and an extra focus, for that call only (`App::quick`, `App::quick_report`). The app writes no reports for people; `examples/reports/*.md` are samples (and the demo's data). Edited in the app (`src/ui/reports.rs`) or by hand.
 - `src/agents.rs`: the known agent CLIs (OpenCode, Claude Code, Codex, Cursor Agent, Pi) and their headless flags. Their marks are in `src/ui/logos.rs`.
 - `src/settings.rs`: the default agent and its model, the summaries folder, and the calls already kept or deleted.

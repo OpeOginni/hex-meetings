@@ -163,9 +163,15 @@ impl Overview {
         self.settings.get(key).and_then(|v| v.as_str())
     }
 
-    /// `day`, `week`, `month` or `forever`; None while unset.
+    /// `day`, `week`, `month`, `forever` or `none`; None while unset.
     pub fn retention(&self) -> Option<&str> {
         self.text("meetings.retention")
+    }
+
+    /// When Hex trashes a finished call's audio: `day`, `week`, `month`, or
+    /// `none` (with the rest of the call); None while unset.
+    pub fn audio_retention(&self) -> Option<&str> {
+        self.text("meetings.audio_retention")
     }
 
     /// Whether Labs › More call apps is on; None when Hex didn't say.
@@ -203,20 +209,31 @@ pub fn turn_on_meetings(hex: &Path) -> Result<(), String> {
     run(hex, &["window", "show", "meetings"]).map(drop)
 }
 
-/// Changes how long Hex keeps finished meetings, as Hex's own window would.
-pub fn set_retention(hex: &Path, value: &str) -> Result<(), String> {
-    run(hex, &["settings", "set", "meetings.retention", value]).map(drop)
+/// Changes `meetings.retention` or `meetings.audio_retention`, as Hex's own
+/// window would.
+pub fn set_keep(hex: &Path, key: &str, value: &str) -> Result<(), String> {
+    run(hex, &["settings", "set", key, value]).map(drop)
 }
 
-/// What Hex does with a finished call, for a given `meetings.retention`.
+/// What Hex does with finished calls, for a given `meetings.retention`.
 pub fn retention_sentence(value: Option<&str>) -> &'static str {
     match value {
-        Some("day") => "Hex keeps it for a day, then moves it to the Trash.",
-        Some("week") => "Hex keeps it for a week, then moves it to the Trash.",
-        Some("month") => "Hex keeps it for a month, then moves it to the Trash.",
-        Some("forever") => "Hex keeps it until you delete it.",
-        // Unset: Hex keeps new meetings 24 hours (its settings say so).
-        _ => "Hex keeps it for 24 hours, then moves it to the Trash.",
+        Some("day") => "Hex keeps calls for a day, then moves them to the Trash. Their Markdown files stay.",
+        Some("week") => "Hex keeps calls for a week, then moves them to the Trash. Their Markdown files stay.",
+        Some("month") => "Hex keeps calls for a month, then moves them to the Trash. Their Markdown files stay.",
+        Some("forever") => "Hex keeps calls until you delete them.",
+        // Unset or `none`: Hex keeps new calls 7 days.
+        _ => "Hex keeps calls for 7 days, then moves them to the Trash. Their Markdown files stay.",
+    }
+}
+
+/// What Hex does with a finished call's audio, for `meetings.audio_retention`.
+pub fn audio_sentence(value: Option<&str>) -> &'static str {
+    match value {
+        Some("day") => "Hex moves a call's audio to the Trash after a day. Its transcript stays.",
+        Some("week") => "Hex moves a call's audio to the Trash after a week. Its transcript stays.",
+        Some("month") => "Hex moves a call's audio to the Trash after a month. Its transcript stays.",
+        _ => "Hex keeps a call's audio as long as the call.",
     }
 }
 
@@ -228,17 +245,11 @@ pub fn open_meetings(hex: &Path) -> Result<(), String> {
 }
 
 /// Moves a finished meeting's Markdown and recording to the Trash, as the
-/// Meetings pane's Delete does (Hex 3.5 and later). Hex asks no confirmation,
-/// so the caller asks first. Hex must be running, so this opens it if needed.
+/// Meetings pane's Delete does. Hex asks no confirmation, so the caller asks
+/// first. Hex must be running, so this opens it if needed.
 pub fn delete(hex: &Path, id: &str) -> Result<(), String> {
     run(hex, &["start"])?;
-    run(hex, &["meetings", "delete", id]).map(drop).map_err(|e| {
-        if e.contains("unrecognized subcommand") {
-            "This Hex can't delete calls from here. Update Hex to 3.5 or later.".to_string()
-        } else {
-            e
-        }
-    })
+    run(hex, &["meetings", "delete", id]).map(drop)
 }
 
 pub fn version(hex: &Path) -> Option<String> {

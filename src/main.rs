@@ -67,6 +67,8 @@ const SCENES: &[Scene] = &[
         s.deleting = Some("demo-sales".into());
         s.trashing = true;
     }),
+    ("find", |s| s.find = rune::TextEdit::new("legal")),
+    ("find-empty", |s| s.find = rune::TextEdit::new("budget review")),
     ("setup", |s| s.page = Page::Setup),
     ("no-reports", |s| s.reports.clear()),
     ("model-menu", |s| {

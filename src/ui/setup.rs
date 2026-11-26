@@ -1,6 +1,6 @@
 //! Setup: which agent writes the results, where results can go, and how
-//! long Hex keeps a call. The agent and places are this app's settings;
-//! the keep time is Hex's own, changed through Hex's command line.
+//! long Hex keeps a call and its audio. The agent and places are this app's
+//! settings; the keep times are Hex's own, changed through Hex's command line.
 
 use rune::{El, TextStyle, col, icon, row, text};
 use rune_kit::{Button, ButtonVariant, ControlSize, Kit, Menu, MenuItem, SegmentedControl, TextInput};
@@ -14,6 +14,7 @@ use crate::hex;
 use crate::paths;
 
 const KEEP: [(&str, &str); 4] = [("day", "A day"), ("week", "A week"), ("month", "A month"), ("forever", "Forever")];
+const KEEP_AUDIO: [(&str, &str); 4] = [("day", "A day"), ("week", "A week"), ("month", "A month"), ("none", "With the call")];
 
 fn agent_row(s: &App, k: &Kit, a: &'static Agent, chosen: Option<&str>) -> El {
     let installed = s.installed.contains(&a.id);
@@ -303,34 +304,40 @@ fn places(s: &App, k: &Kit, hair: f32) -> El {
 
 /// How long Hex keeps finished calls, as a row with its own control.
 fn keeping(s: &App, k: &Kit) -> El {
-    let (current, status) = match &s.overview {
-        Some(Ok(o)) => {
-            let v = o.retention();
-            let status = match v {
-                None => "Not set in Hex, so new calls stay 24 hours".to_string(),
-                Some("forever") => "Until you delete them".to_string(),
-                Some(v) => {
-                    let label = KEEP.iter().find(|(key, _)| *key == v).map_or(v, |(_, l)| l).to_lowercase();
-                    format!("For {label}, then Hex moves them to the Trash")
-                }
-            };
-            (v, status)
-        }
-        Some(Err(_)) => (None, "Open Hex to see how long it keeps calls".into()),
-        None => (None, "Reading Hex's setting…".into()),
-    };
-    let selected = KEEP.iter().position(|(v, _)| Some(*v) == current);
-    let labels: Vec<&str> = KEEP.iter().map(|(_, l)| *l).collect();
-    let control = SegmentedControl::new(&labels, selected)
-        .label("Hex keeps finished calls for")
-        .fit()
-        .on_pick(|s: &mut App, i, _| s.set_retention(KEEP[i].0))
-        .build(k)
-        .key("retention");
-    list_row(k, "keep-row", tile(k, (&oc::ARCHIVE, None)), "Finished calls", Some(status), vec![control])
+    let current = s.overview.as_ref().and_then(|o| o.as_ref().ok()).and_then(|o| o.retention());
+    let control = keep_control(k, "Finished calls", "meetings.retention", &KEEP, current);
+    list_row(k, "keep-row", tile(k, (&oc::ARCHIVE, None)), "Finished calls", Some(status(s, hex::retention_sentence(current))), vec![control])
 }
 
-/// "Show in Finder" with the folder icon; disabled, saying why, when the folder isn't there yet.
+/// When Hex trashes a finished call's audio, keeping its transcript.
+fn keeping_audio(s: &App, k: &Kit) -> El {
+    // Unset means the same as `none`: the audio goes with the call.
+    let current = s.overview.as_ref().and_then(|o| o.as_ref().ok()).map(|o| o.audio_retention().unwrap_or("none"));
+    let control = keep_control(k, "Call audio", "meetings.audio_retention", &KEEP_AUDIO, current);
+    list_row(k, "audio-row", tile(k, (&oc::OUTLINE_AUDIO, None)), "Call audio", Some(status(s, hex::audio_sentence(current))), vec![control])
+}
+
+/// The row's line: Hex's setting, or why it can't be read yet.
+fn status(s: &App, sentence: &str) -> String {
+    match &s.overview {
+        Some(Ok(_)) => sentence.to_string(),
+        Some(Err(_)) => "Open Hex to see how long it keeps calls".into(),
+        None => "Reading Hex's setting\u{2026}".into(),
+    }
+}
+
+/// Picks one of `choices` for a Hex keep setting.
+fn keep_control(k: &Kit, label: &str, setting: &'static str, choices: &'static [(&'static str, &'static str)], current: Option<&str>) -> El {
+    let selected = choices.iter().position(|(v, _)| Some(*v) == current);
+    let labels: Vec<&str> = choices.iter().map(|(_, l)| *l).collect();
+    SegmentedControl::new(&labels, selected)
+        .label(label)
+        .fit()
+        .on_pick(move |s: &mut App, i, _| s.set_keep(setting, choices[i].0))
+        .build(k)
+        .key(setting)
+}
+
 /// "Show in Finder" with the folder icon; nothing until the folder exists.
 fn show_in_finder(k: &Kit, key: &str, folder: Option<std::path::PathBuf>) -> El {
     let Some(folder) = folder else { return rune::el() };
@@ -384,7 +391,7 @@ fn hex_settings(s: &App, k: &Kit, hair: f32, layer: &mut Vec<El>) -> El {
         Some(about),
         vec![small("Choose in Hex", "choose-model", |s| s.open_in_hex(true))],
     );
-    group(k, "hex", hair, vec![meetings, language, speech, keeping(s, k)])
+    group(k, "hex", hair, vec![meetings, language, speech, keeping(s, k), keeping_audio(s, k)])
 }
 
 /// Light, dark, or following the Mac.

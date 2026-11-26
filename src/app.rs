@@ -130,6 +130,8 @@ pub struct App {
     pub meetings_loaded: bool,
     pub list_error: Option<String>,
     pub search: TextEdit,
+    /// Filters the open call's transcript to the lines that contain it.
+    pub find: TextEdit,
     pub selected: Option<String>,
     pub detail: Option<Detail>,
     pub detail_error: Option<String>,
@@ -454,6 +456,7 @@ impl App {
         self.detail_error = None;
         self.armed = None;
         self.quick = Quick::default();
+        self.find = TextEdit::default();
         if let Some(id) = id {
             self.load_detail(&id);
         }
@@ -769,12 +772,13 @@ impl App {
         });
     }
 
-    /// Changes how long Hex keeps finished calls, then reads it back.
-    pub fn set_retention(&mut self, value: &'static str) {
+    /// Changes how long Hex keeps finished calls (`meetings.retention`) or
+    /// their audio (`meetings.audio_retention`), then reads it back.
+    pub fn set_keep(&mut self, key: &'static str, value: &'static str) {
         let Some(path) = self.hex_path().filter(|_| !self.offline) else { return };
         let send = self.send();
         std::thread::spawn(move || {
-            if let Err(e) = hex::set_retention(&path, value) {
+            if let Err(e) = hex::set_keep(&path, key, value) {
                 send(Event::Notice(format!("Hex didn't change how long it keeps calls: {e}")));
             }
             send(Event::Overview(hex::overview(&path)));

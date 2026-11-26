@@ -65,7 +65,7 @@ pub fn sales_detail() -> Detail {
     }
 }
 
-/// Hex's meeting settings and a few of its speech models, as Hex 3.4 lists them.
+/// Hex's meeting settings and a few of its speech models, as Hex 3.5 lists them.
 pub fn overview() -> crate::hex::Overview {
     let model = |id: &str, name: &str, langs: &[&str], installed: bool, selected: bool| crate::speech::SpeechModel {
         id: id.into(),
@@ -112,7 +112,7 @@ pub fn app() -> App {
     let reports = reports();
     App {
         offline: true,
-        hex: Some(HexStatus::Found { path: "/Applications/Hex.app/Contents/MacOS/hex".into(), version: Some("3.4.0".into()) }),
+        hex: Some(HexStatus::Found { path: "/Applications/Hex.app/Contents/MacOS/hex".into(), version: Some("3.5.0".into()) }),
         meetings: meetings(),
         meetings_loaded: true,
         selected: Some("demo-sales".into()),

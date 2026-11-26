@@ -639,7 +639,7 @@ fn afterwards(s: &App, k: &Kit, m: &Meeting) -> El {
     let line = if asking && s.trashing {
         "Moving this call to the Trash\u{2026}".to_string()
     } else if asking {
-        "Move this call's transcript and recording to the Trash? You can put them back from there.".to_string()
+        "Move this call, its recording and its Markdown file to the Trash? You can put them back from there.".to_string()
     } else {
         match &s.overview {
             Some(Ok(o)) => format!("Done with this call? {}", hex::retention_sentence(o.retention())),
@@ -687,7 +687,16 @@ fn avatar(k: &Kit, mine: bool, app: Option<&str>) -> El {
 
 fn transcript(s: &App, k: &Kit) -> El {
     let c = &k.c;
-    let mut out = col().key("transcript").w_full().gap(20.0).child(text("Transcript").font(k.ty.small_medium).color(c.text_faint));
+    let mut find = TextInput::new(&s.find).placeholder("Find in transcript").leading_icon(&oc::MAGNIFYING_GLASS).width(Some(220.0)).on_edit(|s: &mut App| &mut s.find);
+    if !s.find.text.is_empty() {
+        find = find.clear_button().on_action(|s: &mut App, _| s.find = rune::TextEdit::new(""));
+    }
+    let head = row()
+        .w_full()
+        .center_y()
+        .child(text("Transcript").font(k.ty.small_medium).color(c.text_faint).grow(1.0))
+        .child(find.build(k).key("find"));
+    let mut out = col().key("transcript").w_full().gap(20.0).child(head);
     if let Some(e) = &s.detail_error {
         return out.child(text(e.clone()).font(k.ty.ui).color(c.danger.fg).wrap());
     }
@@ -699,10 +708,15 @@ fn transcript(s: &App, k: &Kit) -> El {
         let line = if still { "Hex is still transcribing this call. It shows up here as it does." } else { "Hex didn't hear anything in this call." };
         return out.child(super::empty_small(k, "transcript-empty", &oc::WAVEFORM, line, None));
     }
+    let q = s.find.text.trim().to_lowercase();
+    let shown: Vec<&hex::Entry> = d.entries.iter().filter(|e| q.is_empty() || e.text.to_lowercase().contains(&q)).collect();
+    if shown.is_empty() {
+        return out.child(super::empty_small(k, "find-empty", &oc::MAGNIFYING_GLASS, &format!("Nothing in this call says \u{201c}{}\u{201d}", s.find.text.trim()), None));
+    }
     // One block per change of speaker: the avatar and name once, then each
     // thing they said as its own paragraph (its time shows on hover).
     let app = s.selected_meeting().and_then(|m| m.application.as_deref());
-    for (i, turns) in d.entries.chunk_by(|a, b| a.source == b.source).enumerate() {
+    for (i, turns) in shown.chunk_by(|a, b| a.source == b.source).enumerate() {
         let first = &turns[0];
         let mine = first.source == "microphone";
         let mut said = col().grow(1.0).shrink().min_w(0.0).gap(6.0).child(

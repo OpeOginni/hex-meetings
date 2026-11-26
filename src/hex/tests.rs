@@ -92,7 +92,8 @@ fn reads_hex_meeting_settings_and_models() {
     let settings = parse_settings(
         r#"{"version": 4, "status": "settings", "settings": [
             {"key": "meetings.enabled", "value": true, "kind": "bool", "writable": true},
-            {"key": "meetings.retention", "value": "week", "kind": "choice", "choices": ["day", "week", "month", "forever"], "writable": true},
+            {"key": "meetings.retention", "value": "week", "kind": "choice", "choices": ["day", "week", "month", "forever", "none"], "writable": true},
+            {"key": "meetings.audio_retention", "value": "day", "kind": "choice", "choices": ["day", "week", "month", "forever", "none"], "writable": true},
             {"key": "meetings.output_folder", "value": null, "kind": "path", "writable": true}]}"#,
     )
     .unwrap();
@@ -106,8 +107,11 @@ fn reads_hex_meeting_settings_and_models() {
     }];
     let o = Overview { settings, models };
     assert_eq!(o.retention(), Some("week"));
+    assert_eq!(o.audio_retention(), Some("day"));
     assert!(matches!(crate::speech::fit(&o.models, "en"), crate::speech::Fit::Fits(m) if m.id == "parakeet_unified_en"));
-    assert!(retention_sentence(None).contains("24 hours"));
+    // Unset and `none` both mean Hex's default: 7 days.
+    assert!(retention_sentence(None).contains("7 days"));
+    assert!(retention_sentence(Some("none")).contains("7 days"));
 }
 
 /// Reads this Mac's Hex for real, read-only: the meeting list, the newest

@@ -15,7 +15,7 @@ See the [example reports](examples/reports/) for ideas.
 
 ## Install
 
-You need an **Apple silicon Mac with macOS 15 or later** and **Hex 3.4 or later** (3.5 or later to delete a call from the app). Hex has a Windows build, but its Meetings recording feature is macOS-only, so Hex Meetings is macOS-only too.
+You need an **Apple silicon Mac with macOS 15 or later** and **Hex 3.5 or later**. Hex has a Windows build, but its Meetings recording feature is macOS-only, so Hex Meetings is macOS-only too.
 
 Install the latest release into `/Applications`:
 
