@@ -2,7 +2,7 @@
 //! are read with `hex meetings list|show --json` (JSON version 1), which Hex
 //! documents as never starting the app, opening the microphone, or writing
 //! anything. Only on the person's request: `hex settings` for how long Hex
-//! keeps calls, and `hex window show meetings` to delete one in Hex.
+//! keeps calls, and `hex meetings delete` to move one to the Trash.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -220,11 +220,25 @@ pub fn retention_sentence(value: Option<&str>) -> &'static str {
     }
 }
 
-/// Opens Hex (if needed) on its Meetings pane: where a call is deleted (Hex's
-/// command line has no delete) and the rest of Hex's meeting settings are.
+/// Opens Hex (if needed) on its Meetings pane, where the rest of Hex's
+/// meeting settings are.
 pub fn open_meetings(hex: &Path) -> Result<(), String> {
     run(hex, &["start"])?;
     run(hex, &["window", "show", "meetings"]).map(drop)
+}
+
+/// Moves a finished meeting's Markdown and recording to the Trash, as the
+/// Meetings pane's Delete does (Hex 3.5 and later). Hex asks no confirmation,
+/// so the caller asks first. Hex must be running, so this opens it if needed.
+pub fn delete(hex: &Path, id: &str) -> Result<(), String> {
+    run(hex, &["start"])?;
+    run(hex, &["meetings", "delete", id]).map(drop).map_err(|e| {
+        if e.contains("unrecognized subcommand") {
+            "This Hex can't delete calls from here. Update Hex to 3.5 or later.".to_string()
+        } else {
+            e
+        }
+    })
 }
 
 pub fn version(hex: &Path) -> Option<String> {

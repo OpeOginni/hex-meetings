@@ -63,6 +63,8 @@ pub enum Event {
     Connected(Connection),
     /// Whether Labs › Meetings is on; None while Hex can't say (not running).
     MeetingsOn(Option<bool>),
+    /// Hex moved a call to the Trash, or refused to.
+    Deleted(String, Result<(), String>),
     Notice(String),
     Tick,
 }
@@ -164,8 +166,10 @@ pub struct App {
     pub update: Update,
     /// The report being written or edited on the Reports page.
     pub editing: Option<Draft>,
-    /// The meeting whose deletion was handed to Hex's window.
+    /// Delete was pressed once on this meeting; the next press moves it to the Trash.
     pub deleting: Option<String>,
+    /// Hex is moving `deleting` to the Trash.
+    pub trashing: bool,
     /// The last result saved as Markdown: its run and the file.
     pub saved: Option<(i64, PathBuf)>,
     /// Whether Hex records calls (Labs › Meetings); None until Hex answers.
@@ -379,6 +383,19 @@ impl App {
             Event::MeetingsOn(on) => {
                 self.meetings_on = on;
                 self.turning_on = false;
+            }
+            Event::Deleted(id, result) => {
+                self.trashing = false;
+                self.deleting = None;
+                match result {
+                    Ok(()) => {
+                        self.meetings.retain(|m| m.id != id);
+                        if self.selected.as_deref() == Some(id.as_str()) {
+                            self.select(self.meetings.first().map(|m| m.id.clone()));
+                        }
+                    }
+                    Err(e) => self.notice = Some(format!("Hex didn't delete the call: {e}")),
+                }
             }
             Event::ModelList(id, list) => {
                 self.model_lists.insert(id, list);
@@ -727,24 +744,28 @@ impl App {
 
     /// Keeps the call in Hex, which removes it when its own time is up.
     pub fn keep_call(&mut self, meeting_id: &str) {
-        if self.deleting.as_deref() == Some(meeting_id) {
-            self.deleting = None;
-        }
         if !self.is_settled(meeting_id) {
             self.settings.settled.push(meeting_id.to_string());
             self.save_settings();
         }
     }
 
-    /// Opens Hex's Meetings pane so the person can delete the call there.
-    pub fn delete_in_hex(&mut self, meeting_id: &str) {
-        self.deleting = Some(meeting_id.to_string());
+    /// Asks before deleting: the next press of Move to Trash deletes the call.
+    pub fn ask_delete(&mut self, meeting_id: Option<&str>) {
+        if !self.trashing {
+            self.deleting = meeting_id.map(str::to_string);
+        }
+    }
+
+    /// Has Hex move the call Delete was pressed on to the Trash.
+    pub fn trash_call(&mut self) {
+        let Some(id) = self.deleting.clone().filter(|_| !self.trashing) else { return };
         let Some(path) = self.hex_path().filter(|_| !self.offline) else { return };
+        self.trashing = true;
         let send = self.send();
         std::thread::spawn(move || {
-            if let Err(e) = hex::open_meetings(&path) {
-                send(Event::Notice(format!("Couldn't open Hex: {e}")));
-            }
+            let result = hex::delete(&path, &id);
+            send(Event::Deleted(id, result));
         });
     }
 

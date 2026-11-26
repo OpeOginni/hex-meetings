@@ -1,6 +1,6 @@
 [package]
 name = "hex-meetings"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 license = "MIT"
 description = "An unofficial companion for Hex's Meetings: read your call transcripts and hand them to the agent you already use."

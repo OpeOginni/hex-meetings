@@ -629,27 +629,33 @@ fn delivery(s: &App, k: &Kit, run: &crate::activity::Run) -> Option<El> {
     Some(col().key("delivery").w_full().gap(14.0).padding(14.0).radius(k.radius.lg).fill(c.layer_01).child(preview(k, to, &run.output)).child(bar))
 }
 
-/// After a result: keep the call in Hex until its own time is up, or delete it in Hex now.
+/// After a result: keep the call in Hex until its own time is up, or move it to the Trash now.
 fn afterwards(s: &App, k: &Kit, m: &Meeting) -> El {
     let c = &k.c;
     let small = |label: &str, key: &str, f: Box<dyn Fn(&mut App)>| {
         Button::new(label.to_string()).variant(ButtonVariant::Neutral).control_size(ControlSize::Small).on_press(f).build(k).key(key.to_string())
     };
-    let (keep_id, del_id) = (m.id.clone(), m.id.clone());
-    let keep = move |s: &mut App| s.keep_call(&keep_id);
-    let line = if s.deleting.as_deref() == Some(m.id.as_str()) {
-        "Hex is open at Meetings: delete this call there.".to_string()
+    let asking = s.deleting.as_deref() == Some(m.id.as_str());
+    let line = if asking && s.trashing {
+        "Moving this call to the Trash\u{2026}".to_string()
+    } else if asking {
+        "Move this call's transcript and recording to the Trash? You can put them back from there.".to_string()
     } else {
         match &s.overview {
             Some(Ok(o)) => format!("Done with this call? {}", hex::retention_sentence(o.retention())),
             _ => "Done with this call? Hex keeps it as its settings say.".to_string(),
         }
     };
-    let mut actions = row().gap(8.0);
-    actions = if s.deleting.as_deref() == Some(m.id.as_str()) {
-        actions.child(small("Cancel", "keep", Box::new(keep)))
+    let mut actions = row().gap(8.0).center_y();
+    actions = if asking && s.trashing {
+        actions.child(Spinner::new().size(14.0).build(k))
+    } else if asking {
+        actions.child(small("Cancel", "cancel-delete", Box::new(|s: &mut App| s.ask_delete(None)))).child(super::destructive_button(k, "Move to Trash", "trash-call", App::trash_call))
     } else {
-        actions.child(small("Keep", "keep", Box::new(keep))).child(small("Delete in Hex\u{2026}", "delete-in-hex", Box::new(move |s: &mut App| s.delete_in_hex(&del_id))))
+        let (keep_id, del_id) = (m.id.clone(), m.id.clone());
+        actions
+            .child(small("Keep", "keep", Box::new(move |s: &mut App| s.keep_call(&keep_id))))
+            .child(small("Delete\u{2026}", "delete-call", Box::new(move |s: &mut App| s.ask_delete(Some(&del_id)))))
     };
     row()
         .key("afterwards")

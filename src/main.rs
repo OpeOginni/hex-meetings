@@ -62,6 +62,11 @@ const SCENES: &[Scene] = &[
         s.activity.insert(0, demo::summary_run());
         s.deleting = Some("demo-sales".into());
     }),
+    ("trashing", |s| {
+        s.activity.insert(0, demo::summary_run());
+        s.deleting = Some("demo-sales".into());
+        s.trashing = true;
+    }),
     ("setup", |s| s.page = Page::Setup),
     ("no-reports", |s| s.reports.clear()),
     ("model-menu", |s| {
